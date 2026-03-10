@@ -131,3 +131,12 @@ export type ChildPictogramSetting = {
   pictogram_id: string;
   updated_at: string;
 };
+
+export type SavedBoard = {
+  child_profile_id: string;
+  created_at: string;
+  id: string;
+  name: string;
+  pictogram_ids: string[];
+  updated_at: string;
+};

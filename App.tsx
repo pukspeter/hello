@@ -12,6 +12,7 @@ import { FavoritePictogramRow } from './components/FavoritePictogramRow';
 import { HistoryScreen } from './components/HistoryScreen';
 import { PictogramCard } from './components/PictogramCard';
 import { ProfileScreen } from './components/ProfileScreen';
+import { SavedBoardsPanel } from './components/SavedBoardsPanel';
 import { SearchField } from './components/SearchField';
 import { SentenceResultPanel } from './components/SentenceResultPanel';
 import { SentenceBar } from './components/SentenceBar';
@@ -50,6 +51,7 @@ import { pictogramMatchesSearch } from './lib/pictogram-search';
 import { toPictogramSlug } from './lib/pictogram-slugs';
 import { fetchSentenceHistory, saveSentenceHistoryEntry } from './lib/history';
 import { createCustomPictogram, fetchPictogramCategories, fetchPictograms } from './lib/pictograms';
+import { deleteSavedBoard, fetchSavedBoards, saveSavedBoard } from './lib/saved-boards';
 import {
   createSelectedPictogramItem,
   reorderSelectedPictograms,
@@ -63,6 +65,7 @@ import type {
   PictogramCategory,
   FavoriteSentenceEntry,
   PictogramMatchCandidate,
+  SavedBoard,
   SelectedPictogramItem,
   ChildProfile,
   ChildProfileInput,
@@ -143,17 +146,22 @@ export default function App() {
   const [favoriteEntries, setFavoriteEntries] = useState<FavoriteSentenceEntry[]>([]);
   const [historyEntries, setHistoryEntries] = useState<SentenceHistoryEntry[]>([]);
   const [pictograms, setPictograms] = useState<Pictogram[]>([]);
+  const [savedBoards, setSavedBoards] = useState<SavedBoard[]>([]);
   const [selectedItems, setSelectedItems] = useState<SelectedPictogramItem[]>([]);
   const [activeTab, setActiveTab] = useState<string>(SPEAK_TAB);
   const [activeCategoryId, setActiveCategoryId] = useState<string>(ALL_CATEGORY_ID);
+  const [boardName, setBoardName] = useState('');
   const [caregiverInputText, setCaregiverInputText] = useState('');
   const [caregiverTranscript, setCaregiverTranscript] = useState<string | null>(null);
   const [speakSearchQuery, setSpeakSearchQuery] = useState('');
   const [caregiverSearchQuery, setCaregiverSearchQuery] = useState('');
+  const [boardsError, setBoardsError] = useState<string | null>(null);
   const [caregiverInputError, setCaregiverInputError] = useState<string | null>(null);
   const [caregiverInputWarning, setCaregiverInputWarning] = useState<string | null>(null);
   const [caregiverInputResult, setCaregiverInputResult] = useState<TextToPictogramsResult | null>(null);
   const [favoritesError, setFavoritesError] = useState<string | null>(null);
+  const [isDeletingBoardId, setDeletingBoardId] = useState<string | null>(null);
+  const [isLoadingBoards, setIsLoadingBoards] = useState(true);
   const [isLoadingFavorites, setIsLoadingFavorites] = useState(true);
   const [isLoadingHistory, setIsLoadingHistory] = useState(true);
   const [isLoadingProfiles, setIsLoadingProfiles] = useState(true);
@@ -171,6 +179,7 @@ export default function App() {
   const [generationError, setGenerationError] = useState<string | null>(null);
   const [isMatchingCaregiverText, setIsMatchingCaregiverText] = useState(false);
   const [isMatchingCaregiverVoice, setIsMatchingCaregiverVoice] = useState(false);
+  const [isSavingBoard, setIsSavingBoard] = useState(false);
   const [isGeneratingSentence, setIsGeneratingSentence] = useState(false);
   const [audioError, setAudioError] = useState<string | null>(null);
   const [entryActionError, setEntryActionError] = useState<string | null>(null);
@@ -233,16 +242,20 @@ export default function App() {
       setIsLoading(false);
       setIsLoadingFavorites(false);
       setIsLoadingHistory(false);
+      setIsLoadingBoards(false);
       setIsLoadingProfiles(false);
       setIsLoadingSettings(false);
       setChildProfiles([]);
       setChildPictogramSettings([]);
       setFavoriteEntries([]);
       setHistoryEntries([]);
+      setSavedBoards([]);
       setPictograms([]);
       setCategories([]);
       setActiveChildProfileId(null);
       setSelectedItems([]);
+      setBoardName('');
+      setBoardsError(null);
       setCaregiverInputText('');
       setCaregiverTranscript(null);
       setCaregiverInputError(null);
@@ -259,8 +272,10 @@ export default function App() {
       setFavoritesError(null);
       setIsLoadingFavorites(true);
       setIsLoadingHistory(true);
+      setIsLoadingBoards(true);
       setIsLoadingProfiles(true);
       setIsLoadingSettings(true);
+      setBoardsError(null);
       setHistoryError(null);
       setProfileError(null);
       setSettingsError(null);
@@ -282,6 +297,7 @@ export default function App() {
       setIsLoading(false);
       setIsLoadingFavorites(false);
       setIsLoadingHistory(false);
+      setIsLoadingBoards(false);
       setIsLoadingProfiles(false);
       setIsLoadingSettings(false);
       setErrorMessage(error instanceof Error ? error.message : 'Algandmete laadimine ebaonnestus.');
@@ -379,10 +395,32 @@ export default function App() {
   }, [activeChildProfileId, session?.user.id]);
 
   useEffect(() => {
+    if (!supabase || !session?.user.id) {
+      return;
+    }
+
+    setIsLoadingBoards(true);
+    setBoardsError(null);
+    setSavedBoards([]);
+
+    fetchSavedBoards(activeChildProfileId)
+      .then((entries) => {
+        setSavedBoards(entries);
+      })
+      .catch((error) => {
+        setBoardsError(error instanceof Error ? error.message : 'Saved boardide laadimine ebaonnestus.');
+      })
+      .finally(() => {
+        setIsLoadingBoards(false);
+      });
+  }, [activeChildProfileId, session?.user.id]);
+
+  useEffect(() => {
     setCaregiverInputError(null);
     setCaregiverInputWarning(null);
     setCaregiverInputResult(null);
     setCaregiverTranscript(null);
+    setBoardName('');
   }, [activeChildProfileId]);
 
   const columns =
@@ -407,6 +445,23 @@ export default function App() {
       activeChildProfile?.preferred_language,
       getCustomLabelEtForPictogram(pictogram.id)
     );
+  const buildSelectedItemsFromPictogramIds = (pictogramIds: string[]) =>
+    pictogramIds
+      .map((pictogramId, index) => {
+        const pictogram = pictograms.find((item) => item.id === pictogramId);
+
+        if (!pictogram) {
+          return null;
+        }
+
+        return createSelectedPictogramItem(
+          pictogram,
+          index,
+          getResolvedDisplayLabel(pictogram),
+          getEffectiveLabelEt(pictogram)
+        );
+      })
+      .filter((item): item is SelectedPictogramItem => item !== null);
 
   const favoriteQuickPictograms = pictograms.filter((pictogram) => {
     const setting = settingsByPictogramId.get(pictogram.id);
@@ -723,26 +778,49 @@ export default function App() {
     }
   };
 
+  const handleSaveBoard = async () => {
+    if (!activeChildProfileId) {
+      setBoardsError('Vali enne aktiivne child profile.');
+      return;
+    }
+
+    if (!boardName.trim()) {
+      setBoardsError('Pane saved boardile nimi.');
+      return;
+    }
+
+    if (selectedItems.length === 0) {
+      setBoardsError('Vali enne piktogrammid, mida soovid boardina salvestada.');
+      return;
+    }
+
+    setIsSavingBoard(true);
+    setBoardsError(null);
+
+    try {
+      const savedBoard = await saveSavedBoard({
+        childProfileId: activeChildProfileId,
+        name: boardName,
+        pictogramIds: selectedItems.map((item) => item.pictogramId),
+      });
+
+      setSavedBoards((current) => [
+        savedBoard,
+        ...current.filter((board) => board.id !== savedBoard.id),
+      ]);
+      setBoardName('');
+    } catch (error) {
+      setBoardsError(error instanceof Error ? error.message : 'Saved boardi salvestamine ebaonnestus.');
+    } finally {
+      setIsSavingBoard(false);
+    }
+  };
+
   const hydrateSavedEntryIntoSpeak = (
     entry: SentenceHistoryEntry | FavoriteSentenceEntry,
     options?: { openSpeakTab?: boolean }
   ) => {
-    const nextSelectedItems = entry.pictogram_ids
-      .map((pictogramId, index) => {
-        const pictogram = pictograms.find((item) => item.id === pictogramId);
-
-        if (!pictogram) {
-          return null;
-        }
-
-        return createSelectedPictogramItem(
-          pictogram,
-          index,
-          getResolvedDisplayLabel(pictogram),
-          getEffectiveLabelEt(pictogram)
-        );
-      })
-      .filter((item): item is SelectedPictogramItem => item !== null);
+    const nextSelectedItems = buildSelectedItemsFromPictogramIds(entry.pictogram_ids);
 
     setSelectedItems(nextSelectedItems);
     setGeneratedSentence({
@@ -761,6 +839,37 @@ export default function App() {
   const handleUseSavedEntry = (entry: SentenceHistoryEntry | FavoriteSentenceEntry) => {
     setEntryActionError(null);
     hydrateSavedEntryIntoSpeak(entry, { openSpeakTab: true });
+  };
+
+  const handleLoadBoard = (board: SavedBoard) => {
+    const nextSelectedItems = buildSelectedItemsFromPictogramIds(board.pictogram_ids);
+
+    setBoardsError(
+      nextSelectedItems.length === board.pictogram_ids.length
+        ? null
+        : 'Osa boardi piktogrammidest ei olnud enam kohalikus kataloogis saadaval.'
+    );
+    setSelectedItems(nextSelectedItems);
+    setGeneratedSentence(null);
+    setGenerationError(null);
+    setAudioError(null);
+    clearAudio();
+    setSpeakSearchQuery('');
+    setActiveCategoryId(ALL_CATEGORY_ID);
+  };
+
+  const handleDeleteBoard = async (board: SavedBoard) => {
+    setDeletingBoardId(board.id);
+    setBoardsError(null);
+
+    try {
+      await deleteSavedBoard(board.id);
+      setSavedBoards((current) => current.filter((entry) => entry.id !== board.id));
+    } catch (error) {
+      setBoardsError(error instanceof Error ? error.message : 'Saved boardi kustutamine ebaonnestus.');
+    } finally {
+      setDeletingBoardId(null);
+    }
   };
 
   const handlePlaySavedEntry = async (entry: SentenceHistoryEntry | FavoriteSentenceEntry) => {
@@ -1200,6 +1309,21 @@ export default function App() {
                 {activeChildProfile?.name ?? 'Vali profiil Profile tabis'}
               </Text>
             </View>
+
+            <SavedBoardsPanel
+              activeChildName={activeChildProfile?.name ?? null}
+              boardName={boardName}
+              boards={savedBoards}
+              deletingBoardId={isDeletingBoardId}
+              errorMessage={boardsError}
+              isLoading={isLoadingBoards}
+              isSaving={isSavingBoard}
+              onChangeBoardName={setBoardName}
+              onDeleteBoard={handleDeleteBoard}
+              onLoadBoard={handleLoadBoard}
+              onSaveBoard={handleSaveBoard}
+              selectedCount={selectedItems.length}
+            />
 
             <CaregiverInputPanel
               errorMessage={caregiverInputError}

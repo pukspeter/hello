@@ -140,6 +140,18 @@ create table if not exists child_pictogram_settings (
 alter table child_pictogram_settings
 add column if not exists custom_label_et text;
 
+create table if not exists saved_boards (
+  id uuid primary key default gen_random_uuid(),
+  child_profile_id uuid not null references child_profiles(id) on delete cascade,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now(),
+  name text not null,
+  pictogram_ids jsonb not null default '[]'::jsonb
+);
+
+create unique index if not exists saved_boards_child_profile_name_key
+on saved_boards (child_profile_id, name);
+
 insert into child_profiles (name, preferred_language, notes)
 select 'Kevin', 'et', 'MVP child profile'
 where not exists (
@@ -268,6 +280,7 @@ alter table child_profiles enable row level security;
 alter table sentence_history enable row level security;
 alter table favorite_sentences enable row level security;
 alter table child_pictogram_settings enable row level security;
+alter table saved_boards enable row level security;
 alter table pictograms enable row level security;
 
 drop policy if exists "caregivers_select_own_child_profiles" on child_profiles;
@@ -491,6 +504,70 @@ using (
     select 1
     from child_profiles
     where child_profiles.id = child_pictogram_settings.child_profile_id
+      and child_profiles.user_id = auth.uid()
+  )
+);
+
+drop policy if exists "caregivers_select_own_saved_boards" on saved_boards;
+create policy "caregivers_select_own_saved_boards"
+on saved_boards
+for select
+to authenticated
+using (
+  exists (
+    select 1
+    from child_profiles
+    where child_profiles.id = saved_boards.child_profile_id
+      and child_profiles.user_id = auth.uid()
+  )
+);
+
+drop policy if exists "caregivers_insert_own_saved_boards" on saved_boards;
+create policy "caregivers_insert_own_saved_boards"
+on saved_boards
+for insert
+to authenticated
+with check (
+  exists (
+    select 1
+    from child_profiles
+    where child_profiles.id = saved_boards.child_profile_id
+      and child_profiles.user_id = auth.uid()
+  )
+);
+
+drop policy if exists "caregivers_update_own_saved_boards" on saved_boards;
+create policy "caregivers_update_own_saved_boards"
+on saved_boards
+for update
+to authenticated
+using (
+  exists (
+    select 1
+    from child_profiles
+    where child_profiles.id = saved_boards.child_profile_id
+      and child_profiles.user_id = auth.uid()
+  )
+)
+with check (
+  exists (
+    select 1
+    from child_profiles
+    where child_profiles.id = saved_boards.child_profile_id
+      and child_profiles.user_id = auth.uid()
+  )
+);
+
+drop policy if exists "caregivers_delete_own_saved_boards" on saved_boards;
+create policy "caregivers_delete_own_saved_boards"
+on saved_boards
+for delete
+to authenticated
+using (
+  exists (
+    select 1
+    from child_profiles
+    where child_profiles.id = saved_boards.child_profile_id
       and child_profiles.user_id = auth.uid()
   )
 );

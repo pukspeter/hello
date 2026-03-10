@@ -23,7 +23,7 @@ const GOOGLE_TTS_CREDENTIALS_PATH =
   process.env.GOOGLE_TTS_CREDENTIALS_PATH;
 const GOOGLE_TTS_CREDENTIALS_JSON = process.env.GOOGLE_TTS_CREDENTIALS_JSON;
 const GOOGLE_TTS_LANGUAGE_CODE = process.env.GOOGLE_TTS_LANGUAGE_CODE ?? 'et-EE';
-const GOOGLE_TTS_VOICE_NAME = process.env.GOOGLE_TTS_VOICE_NAME ?? 'et-EE-Standard-A';
+const GOOGLE_TTS_VOICE_NAME = process.env.GOOGLE_TTS_VOICE_NAME ?? 'et-EE-Chirp3-HD-Autonoe';
 const GOOGLE_TTS_AUDIO_ENCODING = process.env.GOOGLE_TTS_AUDIO_ENCODING ?? 'MP3';
 const SUPABASE_URL = process.env.SUPABASE_URL ?? process.env.EXPO_PUBLIC_SUPABASE_URL;
 const SUPABASE_ANON_KEY = process.env.SUPABASE_ANON_KEY ?? process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY;
@@ -93,7 +93,7 @@ class HttpError extends Error {
   }
 }
 
-createServer(async (request, response) => {
+const server = createServer(async (request, response) => {
   if (!request.url) {
     sendJson(response, 404, { error: 'Not found.' });
     return;
@@ -105,8 +105,13 @@ createServer(async (request, response) => {
     return;
   }
 
+  if (request.method === 'GET' && request.url === '/') {
+    sendText(response, 200, 'HELLO API is running');
+    return;
+  }
+
   if (request.method === 'GET' && request.url === '/health') {
-    sendJson(response, 200, { status: 'ok' });
+    sendJson(response, 200, { ok: true });
     return;
   }
 
@@ -141,9 +146,15 @@ createServer(async (request, response) => {
   }
 
   sendJson(response, 404, { error: 'Not found.' });
-}).listen(PORT, HOST, () => {
-  console.log(`HELLO AI server listening on http://${HOST}:${PORT}`);
 });
+
+server.on('error', (error) => {
+  console.error('[startup] HELLO API failed to start');
+  console.error(`[startup] ${error instanceof Error ? error.message : String(error)}`);
+  process.exit(1);
+});
+
+startServer();
 
 async function handleSentenceGeneration(request, response) {
   if (!GOOGLE_CLOUD_PROJECT_ID) {
@@ -534,12 +545,10 @@ async function transcribeAudioWithGoogle(audioBase64) {
       body: JSON.stringify({
         config: {
           autoDecodingConfig: {},
-          features: {
-            enableAutomaticPunctuation: true,
-          },
           languageCodes: [GOOGLE_STT_LANGUAGE_CODE],
           model: GOOGLE_STT_MODEL,
         },
+        configMask: '*',
         content: audioBase64,
       }),
     }
@@ -822,6 +831,14 @@ function sendJson(response, statusCode, body) {
   response.end(JSON.stringify(body));
 }
 
+function sendText(response, statusCode, body) {
+  response.writeHead(statusCode, {
+    'Access-Control-Allow-Origin': '*',
+    'Content-Type': 'text/plain; charset=utf-8',
+  });
+  response.end(body);
+}
+
 function getBaseUrl(request) {
   const protocol = request.headers['x-forwarded-proto'] ?? 'http';
   const host = request.headers.host ?? `${HOST}:${PORT}`;
@@ -981,6 +998,80 @@ function getVertexModelPath() {
   ].join('/');
 }
 
+function startServer() {
+  try {
+    const startupInfo = validateStartupConfiguration();
+
+    server.listen(PORT, HOST, () => {
+      console.log('[startup] HELLO API server started');
+      console.log(`[startup] host=${HOST}`);
+      console.log(`[startup] port=${PORT}`);
+      console.log(
+        `[startup] google_production_credentials_detected=${startupInfo.googleProductionCredentialsDetected}`
+      );
+      console.log(`[startup] google_credentials_source=${startupInfo.googleCredentialSource}`);
+    });
+  } catch (error) {
+    console.error('[startup] HELLO API failed to start');
+    console.error(`[startup] ${error instanceof Error ? error.message : String(error)}`);
+    process.exit(1);
+  }
+}
+
+function validateStartupConfiguration() {
+  const errors = [];
+  const parsedPort = Number(PORT);
+  const credentialCandidate = getGoogleCredentialCandidate();
+  let parsedGoogleCredentials = null;
+
+  if (!Number.isFinite(parsedPort) || parsedPort <= 0) {
+    errors.push('PORT peab olema positiivne number.');
+  }
+
+  if (!HOST?.trim()) {
+    errors.push('HOST puudub.');
+  }
+
+  if (!GOOGLE_CLOUD_PROJECT_ID?.trim()) {
+    errors.push('GOOGLE_CLOUD_PROJECT_ID puudub.');
+  }
+
+  if (!SUPABASE_URL?.trim()) {
+    errors.push('SUPABASE_URL voi EXPO_PUBLIC_SUPABASE_URL puudub.');
+  }
+
+  if (!SUPABASE_ANON_KEY?.trim()) {
+    errors.push('SUPABASE_ANON_KEY voi EXPO_PUBLIC_SUPABASE_ANON_KEY puudub.');
+  }
+
+  if (!SUPABASE_SERVICE_ROLE_KEY?.trim()) {
+    errors.push('SUPABASE_SERVICE_ROLE_KEY puudub.');
+  }
+
+  if (!credentialCandidate.rawJson) {
+    errors.push(
+      'Google credentials puuduvad. Kasuta GOOGLE_SERVICE_ACCOUNT_JSON, GOOGLE_SERVICE_ACCOUNT_PATH, GOOGLE_TTS_CREDENTIALS_JSON, GOOGLE_TTS_CREDENTIALS_PATH voi gcloud auth application-default login.'
+    );
+  } else {
+    try {
+      parsedGoogleCredentials = JSON.parse(credentialCandidate.rawJson);
+    } catch (error) {
+      errors.push(
+        `Google credentials JSON on vigane: ${error instanceof Error ? error.message : 'parse error'}`
+      );
+    }
+  }
+
+  if (errors.length > 0) {
+    throw new Error(['Startup configuration error:', ...errors.map((item) => `- ${item}`)].join('\n'));
+  }
+
+  return {
+    googleCredentialSource: credentialCandidate.source,
+    googleProductionCredentialsDetected: parsedGoogleCredentials?.type === 'service_account',
+  };
+}
+
 function getGoogleServiceAccount() {
   if (googleServiceAccount?.type === 'service_account') {
     return googleServiceAccount;
@@ -1133,33 +1224,58 @@ function getGoogleCredentials() {
 }
 
 function loadGoogleCredentialsJson() {
+  return getGoogleCredentialCandidate().rawJson;
+}
+
+function getGoogleCredentialCandidate() {
   if (GOOGLE_SERVICE_ACCOUNT_JSON?.trim()) {
-    return GOOGLE_SERVICE_ACCOUNT_JSON.trim();
+    return {
+      rawJson: GOOGLE_SERVICE_ACCOUNT_JSON.trim(),
+      source: 'GOOGLE_SERVICE_ACCOUNT_JSON',
+    };
   }
 
   if (GOOGLE_TTS_CREDENTIALS_JSON?.trim()) {
-    return GOOGLE_TTS_CREDENTIALS_JSON.trim();
+    return {
+      rawJson: GOOGLE_TTS_CREDENTIALS_JSON.trim(),
+      source: 'GOOGLE_TTS_CREDENTIALS_JSON',
+    };
   }
 
   const candidatePaths = [];
 
   if (GOOGLE_SERVICE_ACCOUNT_PATH) {
-    candidatePaths.push(resolveCredentialPath(GOOGLE_SERVICE_ACCOUNT_PATH));
+    candidatePaths.push({
+      path: resolveCredentialPath(GOOGLE_SERVICE_ACCOUNT_PATH),
+      source: 'GOOGLE_SERVICE_ACCOUNT_PATH',
+    });
   }
 
   if (GOOGLE_TTS_CREDENTIALS_PATH) {
-    candidatePaths.push(resolveCredentialPath(GOOGLE_TTS_CREDENTIALS_PATH));
+    candidatePaths.push({
+      path: resolveCredentialPath(GOOGLE_TTS_CREDENTIALS_PATH),
+      source: 'GOOGLE_TTS_CREDENTIALS_PATH',
+    });
   }
 
-  candidatePaths.push(resolve(homedir(), '.config/gcloud/application_default_credentials.json'));
+  candidatePaths.push({
+    path: resolve(homedir(), '.config/gcloud/application_default_credentials.json'),
+    source: 'GOOGLE_ADC',
+  });
 
-  for (const candidatePath of candidatePaths) {
-    if (existsSync(candidatePath)) {
-      return readFileSync(candidatePath, 'utf8');
+  for (const candidate of candidatePaths) {
+    if (existsSync(candidate.path)) {
+      return {
+        rawJson: readFileSync(candidate.path, 'utf8'),
+        source: candidate.source,
+      };
     }
   }
 
-  return '';
+  return {
+    rawJson: '',
+    source: 'none',
+  };
 }
 
 function loadDotEnv() {
