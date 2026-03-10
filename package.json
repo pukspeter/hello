@@ -1,11 +1,12 @@
 {
   "name": "hello",
   "version": "1.0.0",
-  "main": "index.ts",
+  "main": "server/index.mjs",
   "scripts": {
     "import:pictograms": "node scripts/import-pictograms.mjs",
     "server": "node server/index.mjs",
-    "start": "expo start",
+    "start": "node server/index.mjs",
+    "start:expo": "expo start",
     "android": "expo start --android",
     "ios": "expo start --ios",
     "web": "expo start --web"

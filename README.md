@@ -28,7 +28,7 @@ Server:
 - `GOOGLE_SERVICE_ACCOUNT_JSON` or `GOOGLE_SERVICE_ACCOUNT_PATH`
 - `GOOGLE_TTS_CREDENTIALS_PATH` or `GOOGLE_TTS_CREDENTIALS_JSON`
 - `GOOGLE_TTS_LANGUAGE_CODE` (optional, default `et-EE`)
-- `GOOGLE_TTS_VOICE_NAME` (optional, default `et-EE-Chirp3-HD-Autonoe`)
+- `GOOGLE_TTS_VOICE_NAME` (optional, default `et-EE-Chirp3-HD-Achernar`)
 - `GOOGLE_TTS_AUDIO_ENCODING` (optional, default `MP3`)
 - `SUPABASE_SERVICE_ROLE_KEY`
 - `SUPABASE_STORAGE_BUCKET` (optional, default `pictograms`)
@@ -62,6 +62,8 @@ Server:
 22. Save it as favorite and verify it appears in the `Favorites` tab for the same child.
 23. Press `Play sentence` to generate Google Cloud TTS audio and hear playback.
 24. Press `Play again` to replay the same cached audio without synthesizing again.
+25. Open `History` and verify each sentence card now shows the actual pictograms used in that sentence instead of raw UUID strings.
+26. Open `Favorites` and verify each favorite sentence card also shows the same visual pictogram strip with labels.
 
 ## Saved boards / routine packs
 
@@ -97,7 +99,7 @@ To enable this feature in Supabase:
    - `GOOGLE_CLOUD_PROJECT_ID=your-project-id`
    - `GOOGLE_TTS_CREDENTIALS_PATH=./secrets/google-tts-service-account.json`
    - `GOOGLE_TTS_LANGUAGE_CODE=et-EE`
-   - `GOOGLE_TTS_VOICE_NAME=et-EE-Chirp3-HD-Autonoe`
+   - `GOOGLE_TTS_VOICE_NAME=et-EE-Chirp3-HD-Achernar`
    - `GOOGLE_TTS_AUDIO_ENCODING=MP3`
 6. If service account key creation is blocked by organization policy, use local ADC instead:
    - install Google Cloud CLI
@@ -171,7 +173,13 @@ Render settings for the API service:
 - Runtime / Language: `Node`
 - Root Directory: leave empty
 - Build Command: `npm install`
-- Start Command: `npm run server`
+- Start Command: `npm start`
+
+Why this works:
+- the API entrypoint is already plain JavaScript at `server/index.mjs`
+- Render does not need `tsx`
+- Render does not need a separate build output folder for the API
+- `npm start` now points directly to the Node API instead of Expo
 
 Required Render environment variables:
 - `GOOGLE_CLOUD_PROJECT_ID`
@@ -205,11 +213,16 @@ Exact Render steps:
 4. Choose runtime `Node`.
 5. Leave `Root Directory` empty.
 6. Set `Build Command` to `npm install`.
-7. Set `Start Command` to `npm run server`.
+7. Set `Start Command` to `npm start`.
 8. Add the environment variables listed above.
 9. Deploy.
 10. After deploy, open `https://your-service.onrender.com/` and verify that the API returns plain text `HELLO API is running`.
 11. Open `https://your-service.onrender.com/health` and verify that the API returns `{"ok":true}`.
+
+Local development stays the same:
+- API: `npm run server`
+- Expo web: `npm run web`
+- Optional Expo dev root command: `npm run start:expo`
 
 What to test after the Render API deploy:
 - `GET /` returns `200` with plain text `HELLO API is running`
