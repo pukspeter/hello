@@ -173,7 +173,7 @@ Required Render environment variables:
 - `GOOGLE_STT_LOCATION`
 - `GOOGLE_STT_LANGUAGE_CODE`
 - `GOOGLE_STT_MODEL`
-- `GOOGLE_SERVICE_ACCOUNT_JSON`
+- `GOOGLE_SERVICE_ACCOUNT_PATH` or `GOOGLE_SERVICE_ACCOUNT_JSON`
 - `GOOGLE_TTS_LANGUAGE_CODE`
 - `GOOGLE_TTS_VOICE_NAME`
 - `GOOGLE_TTS_AUDIO_ENCODING`
@@ -188,7 +188,8 @@ Recommended optional Render environment variables:
 
 Example production credential setup:
 - create one Google Cloud service account with access to Vertex AI, Cloud Speech-to-Text, and Cloud Text-to-Speech
-- copy the full JSON key into the Render secret env var `GOOGLE_SERVICE_ACCOUNT_JSON`
+- add the JSON file as a Render `Secret File`
+- set `GOOGLE_SERVICE_ACCOUNT_PATH=/etc/secrets/google-service-account.json`
 - do not use local ADC on Render
 
 Exact Render steps:
@@ -223,7 +224,7 @@ What startup logs to look for in Render:
 - `[startup] host=0.0.0.0`
 - `[startup] port=<Render assigned port>`
 - `[startup] google_production_credentials_detected=true`
-- `[startup] google_credentials_source=GOOGLE_SERVICE_ACCOUNT_JSON`
+- `[startup] google_credentials_source=GOOGLE_SERVICE_ACCOUNT_PATH`
 
 If startup fails because env vars are missing or broken:
 - Render logs now print `Startup configuration error:`
@@ -232,10 +233,66 @@ If startup fails because env vars are missing or broken:
 Likely deploy blockers:
 - empty GitHub repo
 - wrong Render runtime, like the Elixir service shown in the screenshot
-- missing `GOOGLE_SERVICE_ACCOUNT_JSON`
+- missing `GOOGLE_SERVICE_ACCOUNT_PATH` or missing secret file
 - missing `SUPABASE_SERVICE_ROLE_KEY`
 - `EXPO_PUBLIC_API_BASE_URL` in the web app still pointing at `localhost`
 - Google APIs not enabled in the selected Google project
+
+## Frontend web deployment
+
+The Render `hello-api` service is backend only. To give other people a usable app URL, deploy the Expo web frontend separately as a static site.
+
+### Local production web build
+
+Run:
+- `npm run build:web`
+
+Result:
+- Expo exports a static web build into `dist/`
+
+### Render static site settings
+
+Use a separate Render static site named for example `hello-web`.
+
+Render settings:
+- Runtime: `Static Site`
+- Root Directory: leave empty
+- Build Command: `npm install && npm run build:web`
+- Publish Directory: `dist`
+
+Frontend environment variables on the static site:
+- `EXPO_PUBLIC_SUPABASE_URL=https://nsldpyixflidwpgrkqwm.supabase.co`
+- `EXPO_PUBLIC_SUPABASE_ANON_KEY=<your Supabase publishable key>`
+- `EXPO_PUBLIC_API_BASE_URL=https://hello-api-vkm8.onrender.com`
+
+Important:
+- only `EXPO_PUBLIC_*` variables belong in the frontend deploy
+- do not add `SUPABASE_SERVICE_ROLE_KEY`
+- do not add Google service account credentials
+- after changing `EXPO_PUBLIC_*` variables, redeploy the static site, because Expo bakes them into the build output
+
+### Exact Render flow
+
+1. In Render, click `New`.
+2. Choose `Static Site`.
+3. Connect the same GitHub repo.
+4. Set `Root Directory` empty.
+5. Set `Build Command` to `npm install && npm run build:web`.
+6. Set `Publish Directory` to `dist`.
+7. Add the three `EXPO_PUBLIC_*` variables listed above.
+8. Deploy.
+
+### What to test after frontend deploy
+
+Open the frontend URL and verify:
+1. Login page loads.
+2. Sign in works.
+3. `Speak` loads pictograms from Supabase.
+4. Text to pictograms uses the Render API.
+5. Push-to-talk uses the Render API.
+6. Sentence generation works.
+7. `Play sentence` works.
+8. History and Favorites still load and update.
 
 ## Batch pictogram import
 

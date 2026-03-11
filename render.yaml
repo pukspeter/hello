@@ -7,3 +7,10 @@ services:
     buildCommand: npm install
     startCommand: npm start
     healthCheckPath: /health
+  - type: web
+    name: hello-web
+    runtime: static
+    plan: free
+    rootDir: .
+    buildCommand: npm install && npm run build:web
+    staticPublishPath: ./dist
