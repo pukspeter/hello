@@ -51,10 +51,12 @@ export function SentenceResultPanel({
       <Text style={styles.meta}>AI payload valmis: {payloadCount} piktogrammi</Text>
 
       <View style={styles.card}>
-        <Text style={styles.title}>Loodud lause</Text>
-        <Text style={styles.sentence}>
-          {result?.sentence ?? 'Vali piktogrammid ja loo esimene eestikeelne lause.'}
-        </Text>
+        <View style={styles.textBlock}>
+          <Text style={styles.title}>Loodud lause</Text>
+          <Text style={styles.sentence}>
+            {result?.sentence ?? 'Vali piktogrammid ja loo esimene eestikeelne lause.'}
+          </Text>
+        </View>
         {errorMessage ? <Text style={styles.error}>{errorMessage}</Text> : null}
         {audioErrorMessage ? <Text style={styles.error}>{audioErrorMessage}</Text> : null}
         {!isConfigured ? (
@@ -135,32 +137,36 @@ export function SentenceResultPanel({
 const styles = StyleSheet.create({
   wrapper: {
     paddingHorizontal: 20,
-    paddingTop: 8,
+    paddingTop: 2,
     backgroundColor: '#f7f2e8',
   },
   meta: {
-    fontSize: 12,
+    fontSize: 10,
     color: '#88755c',
-    marginBottom: 8,
+    marginBottom: 4,
   },
   card: {
     borderRadius: 22,
     borderWidth: 1,
     borderColor: '#e8dcc8',
     backgroundColor: '#fff8ee',
-    padding: 18,
-    gap: 12,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    gap: 6,
+  },
+  textBlock: {
+    gap: 4,
   },
   title: {
-    fontSize: 18,
+    fontSize: 15,
     fontWeight: '800',
     color: '#2d2417',
   },
   sentence: {
-    fontSize: 20,
-    lineHeight: 30,
+    fontSize: 16,
+    lineHeight: 22,
     color: '#2d2417',
-    minHeight: 60,
+    minHeight: 0,
   },
   hint: {
     fontSize: 14,
@@ -192,6 +198,7 @@ const styles = StyleSheet.create({
   actionRow: {
     flexDirection: 'row',
     gap: 12,
+    marginTop: 2,
   },
   secondaryButton: {
     flex: 1,

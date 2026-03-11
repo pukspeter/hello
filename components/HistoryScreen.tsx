@@ -1,6 +1,8 @@
 import { ScrollView, StyleSheet, Text, View } from 'react-native';
 import { Pressable } from 'react-native';
+import { SentencePictogramStrip } from './SentencePictogramStrip';
 import type { FavoriteSentenceEntry, SentenceHistoryEntry } from '../types/pictograms';
+import type { SentencePictogramStripItem } from './SentencePictogramStrip';
 
 type HistoryScreenProps = {
   actionErrorMessage?: string | null;
@@ -8,6 +10,7 @@ type HistoryScreenProps = {
   entries: Array<SentenceHistoryEntry | FavoriteSentenceEntry>;
   errorMessage: string | null;
   favoritingEntryId?: string | null;
+  getEntryPictograms: (entry: SentenceHistoryEntry | FavoriteSentenceEntry) => SentencePictogramStripItem[];
   isLoading: boolean;
   isEntryFavorite?: (entry: SentenceHistoryEntry | FavoriteSentenceEntry) => boolean;
   onFavoriteEntry?: (entry: SentenceHistoryEntry | FavoriteSentenceEntry) => void;
@@ -26,6 +29,7 @@ export function HistoryScreen({
   entries,
   errorMessage,
   favoritingEntryId,
+  getEntryPictograms,
   isLoading,
   isEntryFavorite,
   onFavoriteEntry,
@@ -73,13 +77,11 @@ export function HistoryScreen({
       ) : null}
 
       {!isLoading && !errorMessage
-        ? entries.map((entry) => (
+          ? entries.map((entry) => (
             <View key={entry.id} style={styles.card}>
               <Text style={styles.sentence}>{entry.sentence_text}</Text>
               <Text style={styles.meta}>{formatDate(entry.created_at)}</Text>
-              <Text style={styles.ids}>
-                Piktogrammid: {entry.pictogram_ids.length > 0 ? entry.pictogram_ids.join(', ') : '-'}
-              </Text>
+              <SentencePictogramStrip items={getEntryPictograms(entry)} />
               {onFavoriteEntry || onPlayEntry || onRemoveEntry || onUseEntry ? (
                 <View style={styles.actionRow}>
                   {onUseEntry ? (
@@ -250,18 +252,13 @@ const styles = StyleSheet.create({
   meta: {
     fontSize: 14,
     color: '#7a6a4f',
-    marginBottom: 8,
-  },
-  ids: {
-    fontSize: 14,
-    lineHeight: 21,
-    color: '#6a5d49',
+    marginBottom: 2,
   },
   actionRow: {
     flexDirection: 'row',
     flexWrap: 'wrap',
     gap: 10,
-    marginTop: 12,
+    marginTop: 16,
   },
   useButton: {
     borderRadius: 999,
