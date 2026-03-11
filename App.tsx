@@ -16,6 +16,7 @@ import { SavedBoardsPanel } from './components/SavedBoardsPanel';
 import { SearchField } from './components/SearchField';
 import { SentenceResultPanel } from './components/SentenceResultPanel';
 import { SentenceBar } from './components/SentenceBar';
+import type { SentencePictogramStripItem } from './components/SentencePictogramStrip';
 import {
   generateSentence,
   isSentenceApiConfigured,
@@ -118,6 +119,7 @@ const FAVORITES_TAB = 'favorites';
 const PROFILE_TAB = 'profile';
 const CAREGIVER_TAB = 'caregiver';
 const MAX_PICTOGRAM_IMAGE_SIZE_BYTES = 5 * 1024 * 1024;
+const SHOW_SAVED_BOARDS = false;
 
 function shouldPreferPictogramForSlug(next: Pictogram, current: Pictogram) {
   if (next.is_custom !== current.is_custom) {
@@ -335,6 +337,13 @@ export default function App() {
   }, [reloadPictogramCatalog, session?.user.id]);
 
   useEffect(() => {
+    if (!SHOW_SAVED_BOARDS) {
+      setIsLoadingBoards(false);
+      setBoardsError(null);
+      setSavedBoards([]);
+      return;
+    }
+
     if (!supabase || !session?.user.id) {
       return;
     }
@@ -462,6 +471,27 @@ export default function App() {
         );
       })
       .filter((item): item is SelectedPictogramItem => item !== null);
+  const getEntryPictogramItems = (
+    entry: SentenceHistoryEntry | FavoriteSentenceEntry
+  ): SentencePictogramStripItem[] =>
+    entry.pictogram_ids.map((pictogramId, index) => {
+      const pictogram = pictograms.find((item) => item.id === pictogramId);
+
+      if (!pictogram) {
+        return {
+          id: `${entry.id}-${pictogramId}-${index}`,
+          imageUrl: null,
+          isMissingRecord: true,
+          label: 'Puudub',
+        };
+      }
+
+      return {
+        id: `${entry.id}-${pictogram.id}-${index}`,
+        imageUrl: pictogram.image_url,
+        label: getResolvedDisplayLabel(pictogram),
+      };
+    });
 
   const favoriteQuickPictograms = pictograms.filter((pictogram) => {
     const setting = settingsByPictogramId.get(pictogram.id);
@@ -1310,20 +1340,22 @@ export default function App() {
               </Text>
             </View>
 
-            <SavedBoardsPanel
-              activeChildName={activeChildProfile?.name ?? null}
-              boardName={boardName}
-              boards={savedBoards}
-              deletingBoardId={isDeletingBoardId}
-              errorMessage={boardsError}
-              isLoading={isLoadingBoards}
-              isSaving={isSavingBoard}
-              onChangeBoardName={setBoardName}
-              onDeleteBoard={handleDeleteBoard}
-              onLoadBoard={handleLoadBoard}
-              onSaveBoard={handleSaveBoard}
-              selectedCount={selectedItems.length}
-            />
+            {SHOW_SAVED_BOARDS ? (
+              <SavedBoardsPanel
+                activeChildName={activeChildProfile?.name ?? null}
+                boardName={boardName}
+                boards={savedBoards}
+                deletingBoardId={isDeletingBoardId}
+                errorMessage={boardsError}
+                isLoading={isLoadingBoards}
+                isSaving={isSavingBoard}
+                onChangeBoardName={setBoardName}
+                onDeleteBoard={handleDeleteBoard}
+                onLoadBoard={handleLoadBoard}
+                onSaveBoard={handleSaveBoard}
+                selectedCount={selectedItems.length}
+              />
+            ) : null}
 
             <CaregiverInputPanel
               errorMessage={caregiverInputError}
@@ -1458,6 +1490,7 @@ export default function App() {
           entries={historyEntries}
           errorMessage={historyError}
           favoritingEntryId={savingHistoryFavoriteId}
+          getEntryPictograms={getEntryPictogramItems}
           isLoading={isLoadingHistory}
           isEntryFavorite={(entry) =>
             favoriteSignatures.has(buildFavoriteSignature(entry.sentence_text, entry.pictogram_ids))
@@ -1475,6 +1508,7 @@ export default function App() {
           emptyMessage="Salvesta generated sentence lemmikuks Speak vaates."
           entries={favoriteEntries}
           errorMessage={favoritesError}
+          getEntryPictograms={getEntryPictogramItems}
           isLoading={isLoadingFavorites}
           onPlayEntry={handlePlaySavedEntry}
           onRemoveEntry={handleRemoveFavorite}

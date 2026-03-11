@@ -1,7 +1,7 @@
 {
   "name": "hello",
   "version": "1.0.0",
-  "main": "server/index.mjs",
+  "main": "index.ts",
   "scripts": {
     "import:pictograms": "node scripts/import-pictograms.mjs",
     "server": "node server/index.mjs",

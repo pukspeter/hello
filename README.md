@@ -28,7 +28,7 @@ Server:
 - `GOOGLE_SERVICE_ACCOUNT_JSON` or `GOOGLE_SERVICE_ACCOUNT_PATH`
 - `GOOGLE_TTS_CREDENTIALS_PATH` or `GOOGLE_TTS_CREDENTIALS_JSON`
 - `GOOGLE_TTS_LANGUAGE_CODE` (optional, default `et-EE`)
-- `GOOGLE_TTS_VOICE_NAME` (optional, default `et-EE-Chirp3-HD-Achernar`)
+- `GOOGLE_TTS_VOICE_NAME` (optional, default `et-EE-Chirp3-HD-Autonoe`)
 - `GOOGLE_TTS_AUDIO_ENCODING` (optional, default `MP3`)
 - `SUPABASE_SERVICE_ROLE_KEY`
 - `SUPABASE_STORAGE_BUCKET` (optional, default `pictograms`)
@@ -55,34 +55,19 @@ Server:
 15. Tap favorite pictograms from that quick row and verify they are added to the sentence strip.
 16. In `Caregiver`, use `Edit text` on a pictogram row to save a child-specific wording override.
 17. Go back to `Speak` and verify the same pictogram now shows that custom text for the active child.
-18. In `Speak`, select a few pictograms, enter a board name in `Rutiinipaketid`, and press `Save board`.
-19. Verify the saved board appears in the same panel, then press `Load` and confirm the selected sentence bar is filled from that board.
-20. Press `Delete` on that board and verify it disappears.
-21. Generate a Gemini sentence and verify that it is saved to `sentence_history` under the active child.
-22. Save it as favorite and verify it appears in the `Favorites` tab for the same child.
-23. Press `Play sentence` to generate Google Cloud TTS audio and hear playback.
-24. Press `Play again` to replay the same cached audio without synthesizing again.
-25. Open `History` and verify each sentence card now shows the actual pictograms used in that sentence instead of raw UUID strings.
-26. Open `Favorites` and verify each favorite sentence card also shows the same visual pictogram strip with labels.
+18. Generate a Gemini sentence and verify that it is saved to `sentence_history` under the active child.
+19. Save it as favorite and verify it appears in the `Favorites` tab for the same child.
+20. Press `Play sentence` to generate Google Cloud TTS audio and hear playback.
+21. Press `Play again` to replay the same cached audio without synthesizing again.
+22. Open `History` and verify each sentence card now shows the actual pictograms used in that sentence instead of raw UUID strings.
+23. Open `Favorites` and verify each favorite sentence card also shows the same visual pictogram strip with labels.
 
 ## Saved boards / routine packs
 
-The app supports child-specific saved boards for common routines such as:
-- school morning
-- bedtime
-- car ride
-- outing
-- home routine
-
-Current MVP behavior:
-- boards are stored per `child_profile_id`
-- `Save board` stores the current selected sentence bar pictograms
-- saving with the same board name updates that child's existing board
-- `Load` fills the selected sentence bar from the saved board
-- `Delete` removes the board
-
-To enable this feature in Supabase:
-- re-run `supabase/schema.sql` so the `saved_boards` table and RLS policies exist
+The saved boards data model is still in the codebase, but the UI is currently hidden.
+Reason:
+- the current board UX is not stable enough for live testing
+- it will be brought back later behind a cleaner caregiver flow
 
 ## Google Cloud TTS setup
 
@@ -99,7 +84,7 @@ To enable this feature in Supabase:
    - `GOOGLE_CLOUD_PROJECT_ID=your-project-id`
    - `GOOGLE_TTS_CREDENTIALS_PATH=./secrets/google-tts-service-account.json`
    - `GOOGLE_TTS_LANGUAGE_CODE=et-EE`
-   - `GOOGLE_TTS_VOICE_NAME=et-EE-Chirp3-HD-Achernar`
+   - `GOOGLE_TTS_VOICE_NAME=et-EE-Chirp3-HD-Autonoe`
    - `GOOGLE_TTS_AUDIO_ENCODING=MP3`
 6. If service account key creation is blocked by organization policy, use local ADC instead:
    - install Google Cloud CLI
