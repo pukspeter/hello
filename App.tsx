@@ -121,6 +121,49 @@ const CAREGIVER_TAB = 'caregiver';
 const MAX_PICTOGRAM_IMAGE_SIZE_BYTES = 5 * 1024 * 1024;
 const SHOW_SAVED_BOARDS = false;
 
+function formatAuthErrorMessage(message: string) {
+  const normalized = message.trim().toLowerCase();
+
+  if (
+    normalized.includes('invalid login credentials') ||
+    normalized.includes('invalid credentials')
+  ) {
+    return 'Vale email voi parool.';
+  }
+
+  if (normalized.includes('email not confirmed')) {
+    return 'Kinnita oma email ja proovi siis uuesti sisse logida.';
+  }
+
+  if (
+    normalized.includes('user already registered') ||
+    normalized.includes('already been registered')
+  ) {
+    return 'Selle emailiga konto on juba olemas. Proovi sisse logida.';
+  }
+
+  if (normalized.includes('password should be at least')) {
+    return 'Parool peab olema vahemalt 6 tahemarki.';
+  }
+
+  if (
+    normalized.includes('unable to validate email address') ||
+    normalized.includes('invalid email')
+  ) {
+    return 'Sisesta korrektne emaili aadress.';
+  }
+
+  if (normalized.includes('email rate limit exceeded')) {
+    return 'Proovi mone minuti parast uuesti.';
+  }
+
+  if (normalized.includes('signup is disabled')) {
+    return 'Konto loomine on hetkel valja lulitatud.';
+  }
+
+  return message;
+}
+
 function shouldPreferPictogramForSlug(next: Pictogram, current: Pictogram) {
   if (next.is_custom !== current.is_custom) {
     return current.is_custom;
@@ -998,7 +1041,11 @@ export default function App() {
     try {
       await signInCaregiver(email, password);
     } catch (error) {
-      setAuthError(error instanceof Error ? error.message : 'Sisselogimine ebaonnestus.');
+      setAuthError(
+        error instanceof Error
+          ? formatAuthErrorMessage(error.message)
+          : 'Sisselogimine ebaonnestus.',
+      );
       throw error;
     } finally {
       setIsSubmittingAuth(false);
@@ -1015,9 +1062,15 @@ export default function App() {
 
       if (requiresEmailConfirmation) {
         setAuthInfo('Konto loodi. Kinnita email ja logi siis sisse.');
+      } else {
+        setAuthInfo('Konto loodi. Oled nuud sisse logitud.');
       }
     } catch (error) {
-      setAuthError(error instanceof Error ? error.message : 'Konto loomine ebaonnestus.');
+      setAuthError(
+        error instanceof Error
+          ? formatAuthErrorMessage(error.message)
+          : 'Konto loomine ebaonnestus.',
+      );
       throw error;
     } finally {
       setIsSubmittingAuth(false);
@@ -1181,10 +1234,10 @@ export default function App() {
         current.map((item) =>
           item.pictogramId === pictogramId
             ? {
-                ...item,
-                displayLabel: nextDisplayLabel,
-                label: nextEffectiveLabelEt,
-              }
+              ...item,
+              displayLabel: nextDisplayLabel,
+              label: nextEffectiveLabelEt,
+            }
             : item
         )
       );
