@@ -331,11 +331,22 @@ export default function App() {
       const nextActiveProfile =
         profilesResult.find((profile) => profile.id === activeChildProfileId) ?? profilesResult[0] ?? null;
 
-      await reloadPictogramCatalog(nextActiveProfile?.preferred_symbol_set_code ?? 'hello');
-
       setChildProfiles(profilesResult);
-      setActiveChildProfileId((current) => current ?? profilesResult[0]?.id ?? null);
+      setActiveChildProfileId((current) =>
+        current && profilesResult.some((profile) => profile.id === current)
+          ? current
+          : profilesResult[0]?.id ?? null
+      );
       setIsLoadingProfiles(false);
+
+      try {
+        await reloadPictogramCatalog(nextActiveProfile?.preferred_symbol_set_code ?? 'hello');
+      } catch (error) {
+        setErrorMessage(
+          error instanceof Error ? error.message : 'Piktogrammide kataloogi laadimine ebaonnestus.'
+        );
+      }
+
       setIsLoading(false);
     };
 
@@ -348,7 +359,7 @@ export default function App() {
       setIsLoadingSettings(false);
       setErrorMessage(error instanceof Error ? error.message : 'Algandmete laadimine ebaonnestus.');
     });
-  }, [activeChildProfileId, reloadPictogramCatalog, session?.user.id]);
+  }, [reloadPictogramCatalog, session?.user.id]);
 
   useEffect(() => {
     if (Platform.OS !== 'web' || !session?.user.id) {
@@ -762,12 +773,12 @@ export default function App() {
       return;
     }
 
-    setIsMatchingCaregiverVoice(true);
     setCaregiverInputError(null);
     setCaregiverInputWarning(null);
 
     try {
       const recording = await stopRecording();
+      setIsMatchingCaregiverVoice(true);
       const result = await transcribeAndMatchVoiceToPictograms({
         audioBase64: recording.audioBase64,
         availablePictograms: caregiverMatchCandidates,
