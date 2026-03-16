@@ -21,7 +21,13 @@ type RawPictogram = {
   label_en: string | null;
   label_et: string;
   label_ru: string | null;
+  pictogram_symbol_variants?: RawPictogramSymbolVariant[] | null;
   sort_order: number;
+};
+
+type RawPictogramSymbolVariant = {
+  image_url: string;
+  symbol_set_code: string;
 };
 
 export async function fetchPictogramCategories(): Promise<PictogramCategory[]> {
@@ -45,15 +51,19 @@ export async function fetchPictogramCategories(): Promise<PictogramCategory[]> {
   }));
 }
 
-export async function fetchPictograms(): Promise<Pictogram[]> {
+export async function fetchPictograms(options?: {
+  preferredSymbolSetCode?: string | null;
+}): Promise<Pictogram[]> {
   if (!supabase) {
     return [];
   }
 
+  const preferredSymbolSetCode = options?.preferredSymbolSetCode?.trim() || 'hello';
+
   const { data, error } = await supabase
     .from('pictograms')
     .select(
-      'created_by_user_id, id, category_id, image_url, is_custom, is_enabled, label_en, label_et, label_ru, sort_order'
+      'created_by_user_id, id, category_id, image_url, is_custom, is_enabled, label_en, label_et, label_ru, sort_order, pictogram_symbol_variants(symbol_set_code, image_url)'
     )
     .eq('is_enabled', true)
     .order('sort_order');
@@ -62,7 +72,7 @@ export async function fetchPictograms(): Promise<Pictogram[]> {
     throw new Error(error.message);
   }
 
-  return (data ?? []).map(normalizePictogram);
+  return (data ?? []).map((pictogram) => normalizePictogram(pictogram, preferredSymbolSetCode));
 }
 
 export async function createCustomPictogram(
@@ -106,7 +116,7 @@ export async function createCustomPictogram(
     throw new Error(formatCreateCustomPictogramError(error, normalizedLabel));
   }
 
-  return normalizePictogram(data);
+  return normalizePictogram(data, 'hello');
 }
 
 function formatCreateCustomPictogramError(
@@ -123,17 +133,44 @@ function formatCreateCustomPictogramError(
   return error.message;
 }
 
-function normalizePictogram(pictogram: RawPictogram): Pictogram {
+function normalizePictogram(
+  pictogram: RawPictogram,
+  preferredSymbolSetCode: string
+): Pictogram {
+  const resolvedVariant = resolvePictogramVariant(
+    pictogram.pictogram_symbol_variants ?? [],
+    preferredSymbolSetCode,
+    pictogram.image_url
+  );
+
   return {
     created_by_user_id: pictogram.created_by_user_id,
     id: pictogram.id,
     category_id: pictogram.category_id,
-    image_url: pictogram.image_url,
+    image_url: resolvedVariant.imageUrl,
     is_custom: pictogram.is_custom,
     is_enabled: pictogram.is_enabled,
     label_en: pictogram.label_en,
     label_et: pictogram.label_et,
     label_ru: pictogram.label_ru,
+    resolved_symbol_set_code: resolvedVariant.symbolSetCode,
     sort_order: pictogram.sort_order,
+  };
+}
+
+function resolvePictogramVariant(
+  variants: RawPictogramSymbolVariant[],
+  preferredSymbolSetCode: string,
+  fallbackImageUrl: string | null
+) {
+  const normalizedPreferredSymbolSetCode = preferredSymbolSetCode.trim().toLowerCase();
+  const preferredVariant =
+    variants.find((variant) => variant.symbol_set_code === normalizedPreferredSymbolSetCode) ?? null;
+  const helloVariant = variants.find((variant) => variant.symbol_set_code === 'hello') ?? null;
+  const resolvedVariant = preferredVariant ?? helloVariant ?? null;
+
+  return {
+    imageUrl: resolvedVariant?.image_url ?? fallbackImageUrl,
+    symbolSetCode: resolvedVariant?.symbol_set_code ?? 'hello',
   };
 }

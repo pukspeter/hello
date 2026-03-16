@@ -14,6 +14,7 @@ export type Pictogram = {
   label_en: string | null;
   label_et: string;
   label_ru: string | null;
+  resolved_symbol_set_code: string;
   sort_order: number;
 };
 
@@ -109,6 +110,7 @@ export type ChildProfile = {
   name: string;
   notes: string | null;
   preferred_language: string;
+  preferred_symbol_set_code: string;
   user_id: string | null;
 };
 
@@ -116,6 +118,7 @@ export type ChildProfileInput = {
   name: string;
   notes: string | null;
   preferred_language: string;
+  preferred_symbol_set_code?: string;
 };
 
 export type CustomPictogramInput = {

@@ -15,6 +15,9 @@ const GOOGLE_GEMINI_MODEL = process.env.GOOGLE_GEMINI_MODEL ?? 'gemini-2.5-flash
 const GOOGLE_STT_LOCATION = process.env.GOOGLE_STT_LOCATION ?? 'global';
 const GOOGLE_STT_LANGUAGE_CODE = process.env.GOOGLE_STT_LANGUAGE_CODE ?? 'et-EE';
 const GOOGLE_STT_MODEL = process.env.GOOGLE_STT_MODEL ?? 'short';
+const GOOGLE_TOKEN_TIMEOUT_MS = Number(process.env.GOOGLE_TOKEN_TIMEOUT_MS ?? 15000);
+const GOOGLE_VERTEX_TIMEOUT_MS = Number(process.env.GOOGLE_VERTEX_TIMEOUT_MS ?? 30000);
+const GOOGLE_STT_TIMEOUT_MS = Number(process.env.GOOGLE_STT_TIMEOUT_MS ?? 30000);
 const GOOGLE_SERVICE_ACCOUNT_PATH =
   process.env.GOOGLE_SERVICE_ACCOUNT_PATH ?? process.env.GOOGLE_APPLICATION_CREDENTIALS;
 const GOOGLE_SERVICE_ACCOUNT_JSON =
@@ -93,6 +96,32 @@ class HttpError extends Error {
   }
 }
 
+function logPerf(scope, phase, startedAt, detail = '') {
+  const durationMs = Date.now() - startedAt;
+  const suffix = detail ? ` ${detail}` : '';
+  console.info(`[perf] ${scope} ${phase} ${durationMs}ms${suffix}`);
+}
+
+async function fetchWithTimeout(url, options, timeoutMs, timeoutMessage) {
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
+
+  try {
+    return await fetch(url, {
+      ...options,
+      signal: controller.signal,
+    });
+  } catch (error) {
+    if (error instanceof Error && error.name === 'AbortError') {
+      throw new Error(timeoutMessage);
+    }
+
+    throw error;
+  } finally {
+    clearTimeout(timeoutId);
+  }
+}
+
 const server = createServer(async (request, response) => {
   if (!request.url) {
     sendJson(response, 404, { error: 'Not found.' });
@@ -164,9 +193,13 @@ async function handleSentenceGeneration(request, response) {
     return;
   }
 
+  const scope = 'sentence_generation';
+  const requestStartedAt = Date.now();
+
   try {
     getGoogleCredentials();
     const body = await readJson(request);
+    logPerf(scope, 'read_request_json', requestStartedAt);
     const pictograms = Array.isArray(body?.pictograms) ? body.pictograms : [];
 
     if (pictograms.length === 0) {
@@ -186,6 +219,8 @@ async function handleSentenceGeneration(request, response) {
       .filter((item) => item.id && item.label)
       .sort((left, right) => left.order - right.order);
 
+    logPerf(scope, 'normalize_pictograms', requestStartedAt, `count=${normalizedPictograms.length}`);
+
     if (normalizedPictograms.length === 0) {
       sendJson(response, 400, {
         error: 'Piktogrammiandmed on vigased.',
@@ -193,51 +228,62 @@ async function handleSentenceGeneration(request, response) {
       return;
     }
 
+    const tokenStartedAt = Date.now();
     const accessToken = await getGoogleAccessToken();
+    logPerf(scope, 'google_access_token', tokenStartedAt);
     const modelPath = getVertexModelPath();
 
-    const aiResponse = await fetch(`https://aiplatform.googleapis.com/v1/${modelPath}:generateContent`, {
-      method: 'POST',
-      headers: {
-        Authorization: `Bearer ${accessToken}`,
-        'Content-Type': 'application/json; charset=utf-8',
-        'x-goog-user-project': GOOGLE_CLOUD_PROJECT_ID,
-      },
-      body: JSON.stringify({
-        systemInstruction: {
-          parts: [
-            {
-              text:
-                'You create short, grammatically correct AAC support sentences in Estonian. ' +
-                'Use only the intent that is strongly supported by the pictogram labels. ' +
-                'Keep wording natural, child-friendly, and stable across repeated requests. ' +
-                'Return only valid JSON that matches the provided response schema.',
-            },
-          ],
+    const vertexStartedAt = Date.now();
+    const aiResponse = await fetchWithTimeout(
+      `https://aiplatform.googleapis.com/v1/${modelPath}:generateContent`,
+      {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${accessToken}`,
+          'Content-Type': 'application/json; charset=utf-8',
+          'x-goog-user-project': GOOGLE_CLOUD_PROJECT_ID,
         },
-        contents: [
-          {
-            role: 'user',
+        body: JSON.stringify({
+          systemInstruction: {
             parts: [
               {
                 text:
-                  'Create one Estonian sentence from these pictograms in the given order: ' +
-                  JSON.stringify(normalizedPictograms) +
-                  '. If needed, add minimal helper words for correct Estonian grammar. ' +
-                  'Do not add information that is not implied by the pictograms.',
+                  'You create short, grammatically correct AAC support sentences in Estonian. ' +
+                  'Use only the intent that is strongly supported by the pictogram labels. ' +
+                  'Keep wording natural, child-friendly, and stable across repeated requests. ' +
+                  'Return only valid JSON that matches the provided response schema.',
               },
             ],
           },
-        ],
-        generationConfig: {
-          temperature: 0,
-          responseMimeType: 'application/json',
-          responseSchema: sentenceSchema,
-        },
-      }),
-    });
+          contents: [
+            {
+              role: 'user',
+              parts: [
+                {
+                  text:
+                    'Create one Estonian sentence from these pictograms in the given order: ' +
+                    JSON.stringify(normalizedPictograms) +
+                    '. If needed, add minimal helper words for correct Estonian grammar. ' +
+                    'Do not add information that is not implied by the pictograms.',
+                },
+              ],
+            },
+          ],
+          generationConfig: {
+            temperature: 0,
+            responseMimeType: 'application/json',
+            responseSchema: sentenceSchema,
+          },
+        }),
+      },
+      GOOGLE_VERTEX_TIMEOUT_MS,
+      'Gemini lause genereerimine aegus.'
+    );
+    logPerf(scope, 'vertex_generate_content', vertexStartedAt, `status=${aiResponse.status}`);
 
+    const parsePayloadStartedAt = Date.now();
     const payload = await aiResponse.json();
+    logPerf(scope, 'parse_response_json', parsePayloadStartedAt);
 
     if (!aiResponse.ok) {
       sendJson(response, 502, {
@@ -246,7 +292,9 @@ async function handleSentenceGeneration(request, response) {
       return;
     }
 
+    const extractTextStartedAt = Date.now();
     const rawText = extractGeminiText(payload);
+    logPerf(scope, 'extract_response_text', extractTextStartedAt, `chars=${rawText?.length ?? 0}`);
 
     if (!rawText) {
       sendJson(response, 502, {
@@ -255,7 +303,9 @@ async function handleSentenceGeneration(request, response) {
       return;
     }
 
+    const parseResultStartedAt = Date.now();
     const result = JSON.parse(rawText);
+    logPerf(scope, 'parse_result_json', parseResultStartedAt);
 
     if (
       typeof result?.sentence !== 'string' ||
@@ -267,11 +317,13 @@ async function handleSentenceGeneration(request, response) {
       return;
     }
 
+    logPerf(scope, 'complete', requestStartedAt, `sentence_chars=${result.sentence.length}`);
     sendJson(response, 200, {
       sentence: result.sentence,
       plainText: result.plainText,
     });
   } catch (error) {
+    logPerf(scope, 'failed', requestStartedAt, error instanceof Error ? error.message : 'unknown_error');
     sendJson(response, 500, {
       error: error instanceof Error ? error.message : 'Tundmatu serveriviga.',
     });
@@ -448,64 +500,81 @@ async function handleTextToSpeech(request, response) {
 }
 
 async function matchTextToPictogramsWithGemini(text, availablePictograms) {
+  const scope = 'text_to_pictograms';
+  const requestStartedAt = Date.now();
+  const tokenStartedAt = Date.now();
   const accessToken = await getGoogleAccessToken();
+  logPerf(scope, 'google_access_token', tokenStartedAt);
   const modelPath = getVertexModelPath();
-  const aiResponse = await fetch(`https://aiplatform.googleapis.com/v1/${modelPath}:generateContent`, {
-    method: 'POST',
-    headers: {
-      Authorization: `Bearer ${accessToken}`,
-      'Content-Type': 'application/json; charset=utf-8',
-      'x-goog-user-project': GOOGLE_CLOUD_PROJECT_ID,
-    },
-    body: JSON.stringify({
-      systemInstruction: {
-        parts: [
-          {
-            text:
-              'You map caregiver sentences to AAC pictograms. ' +
-              'Choose only pictogram slugs from the allowed list. ' +
-              'Return a short normalized Estonian sentence and an ordered slug array. ' +
-              'Do not explain your reasoning. Return only valid JSON that matches the response schema.',
-          },
-        ],
+  const vertexStartedAt = Date.now();
+  const aiResponse = await fetchWithTimeout(
+    `https://aiplatform.googleapis.com/v1/${modelPath}:generateContent`,
+    {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+        'Content-Type': 'application/json; charset=utf-8',
+        'x-goog-user-project': GOOGLE_CLOUD_PROJECT_ID,
       },
-      contents: [
-        {
-          role: 'user',
+      body: JSON.stringify({
+        systemInstruction: {
           parts: [
             {
               text:
-                'Caregiver sentence: ' +
-                JSON.stringify(text) +
-                '\nAllowed pictograms: ' +
-                JSON.stringify(availablePictograms) +
-                '\nChoose the smallest useful ordered set of pictogram slugs that preserves the meaning. ' +
-                'Only use slugs from the allowed list.',
+                'You map caregiver sentences to AAC pictograms. ' +
+                'Choose only pictogram slugs from the allowed list. ' +
+                'Return a short normalized Estonian sentence and an ordered slug array. ' +
+                'Do not explain your reasoning. Return only valid JSON that matches the response schema.',
             },
           ],
         },
-      ],
-      generationConfig: {
-        temperature: 0,
-        responseMimeType: 'application/json',
-        responseSchema: pictogramMatchSchema,
-      },
-    }),
-  });
+        contents: [
+          {
+            role: 'user',
+            parts: [
+              {
+                text:
+                  'Caregiver sentence: ' +
+                  JSON.stringify(text) +
+                  '\nAllowed pictograms: ' +
+                  JSON.stringify(availablePictograms) +
+                  '\nChoose the smallest useful ordered set of pictogram slugs that preserves the meaning. ' +
+                  'Only use slugs from the allowed list.',
+              },
+            ],
+          },
+        ],
+        generationConfig: {
+          temperature: 0,
+          responseMimeType: 'application/json',
+          responseSchema: pictogramMatchSchema,
+        },
+      }),
+    },
+    GOOGLE_VERTEX_TIMEOUT_MS,
+    'Gemini piktogrammide mapping aegus.'
+  );
+  logPerf(scope, 'vertex_generate_content', vertexStartedAt, `status=${aiResponse.status}`);
 
+  const parsePayloadStartedAt = Date.now();
   const payload = await aiResponse.json();
+  logPerf(scope, 'parse_response_json', parsePayloadStartedAt);
 
   if (!aiResponse.ok) {
     throw new Error(payload?.error?.message ?? 'Gemini piktogrammide mapping ebaonnestus.');
   }
 
+  const extractTextStartedAt = Date.now();
   const rawText = extractGeminiText(payload);
+  logPerf(scope, 'extract_response_text', extractTextStartedAt, `chars=${rawText?.length ?? 0}`);
 
   if (!rawText) {
     throw new Error('Gemini ei tagastanud loetavat mapping vastust.');
   }
 
+  const parseResultStartedAt = Date.now();
   const result = JSON.parse(rawText);
+  logPerf(scope, 'parse_result_json', parseResultStartedAt);
 
   if (
     typeof result?.plainText !== 'string' ||
@@ -524,6 +593,7 @@ async function matchTextToPictogramsWithGemini(text, availablePictograms) {
   const matchedPictogramSlugs =
     geminiMatchedPictogramSlugs.length > 0 ? geminiMatchedPictogramSlugs : fallbackMatchedPictogramSlugs;
 
+  logPerf(scope, 'complete', requestStartedAt, `matched=${matchedPictogramSlugs.length}`);
   return {
     plainText: result.plainText.trim() || text,
     normalizedSentence: result.normalizedSentence.trim() || text,
@@ -532,8 +602,13 @@ async function matchTextToPictogramsWithGemini(text, availablePictograms) {
 }
 
 async function transcribeAudioWithGoogle(audioBase64) {
+  const scope = 'speech_to_text';
+  const requestStartedAt = Date.now();
+  const tokenStartedAt = Date.now();
   const accessToken = await getGoogleAccessToken();
-  const response = await fetch(
+  logPerf(scope, 'google_access_token', tokenStartedAt);
+  const recognizeStartedAt = Date.now();
+  const response = await fetchWithTimeout(
     `https://speech.googleapis.com/v2/projects/${GOOGLE_CLOUD_PROJECT_ID}/locations/${GOOGLE_STT_LOCATION}/recognizers/_:recognize`,
     {
       method: 'POST',
@@ -551,10 +626,15 @@ async function transcribeAudioWithGoogle(audioBase64) {
         configMask: '*',
         content: audioBase64,
       }),
-    }
+    },
+    GOOGLE_STT_TIMEOUT_MS,
+    'Google Speech-to-Text aegus.'
   );
+  logPerf(scope, 'recognize', recognizeStartedAt, `status=${response.status}`);
 
+  const parsePayloadStartedAt = Date.now();
   const payload = await response.json();
+  logPerf(scope, 'parse_response_json', parsePayloadStartedAt);
 
   if (!response.ok) {
     throw new Error(
@@ -572,6 +652,7 @@ async function transcribeAudioWithGoogle(audioBase64) {
     throw new Error('Google Speech-to-Text ei tagastanud transkriptsiooni.');
   }
 
+  logPerf(scope, 'complete', requestStartedAt, `chars=${transcript.length}`);
   return transcript;
 }
 
@@ -1088,7 +1169,9 @@ function getGoogleServiceAccount() {
 }
 
 async function getGoogleAccessToken() {
+  const startedAt = Date.now();
   if (googleAccessTokenCache && googleAccessTokenCache.expiresAt > Date.now()) {
+    logPerf('google_access_token', 'cache_hit', startedAt);
     return googleAccessTokenCache.accessToken;
   }
 
@@ -1110,16 +1193,21 @@ async function getGoogleAccessToken() {
       credentials.private_key
     );
 
-    const tokenResponse = await fetch(tokenUri, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/x-www-form-urlencoded',
+    const tokenResponse = await fetchWithTimeout(
+      tokenUri,
+      {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/x-www-form-urlencoded',
+        },
+        body: new URLSearchParams({
+          grant_type: 'urn:ietf:params:oauth:grant-type:jwt-bearer',
+          assertion,
+        }),
       },
-      body: new URLSearchParams({
-        grant_type: 'urn:ietf:params:oauth:grant-type:jwt-bearer',
-        assertion,
-      }),
-    });
+      GOOGLE_TOKEN_TIMEOUT_MS,
+      'Google OAuth access tokeni hankimine aegus.'
+    );
 
     tokenPayload = await tokenResponse.json();
 
@@ -1132,18 +1220,23 @@ async function getGoogleAccessToken() {
     }
   } else if (credentials.type === 'authorized_user') {
     const tokenUri = credentials.token_uri ?? 'https://oauth2.googleapis.com/token';
-    const tokenResponse = await fetch(tokenUri, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/x-www-form-urlencoded',
+    const tokenResponse = await fetchWithTimeout(
+      tokenUri,
+      {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/x-www-form-urlencoded',
+        },
+        body: new URLSearchParams({
+          client_id: credentials.client_id,
+          client_secret: credentials.client_secret,
+          refresh_token: credentials.refresh_token,
+          grant_type: 'refresh_token',
+        }),
       },
-      body: new URLSearchParams({
-        client_id: credentials.client_id,
-        client_secret: credentials.client_secret,
-        refresh_token: credentials.refresh_token,
-        grant_type: 'refresh_token',
-      }),
-    });
+      GOOGLE_TOKEN_TIMEOUT_MS,
+      'Google user ADC access tokeni hankimine aegus.'
+    );
 
     tokenPayload = await tokenResponse.json();
 
@@ -1163,6 +1256,7 @@ async function getGoogleAccessToken() {
     expiresAt: Date.now() + Math.max((Number(tokenPayload.expires_in) || 3600) - 60, 60) * 1000,
   };
 
+  logPerf('google_access_token', 'refresh', startedAt, `type=${credentials.type}`);
   return googleAccessTokenCache.accessToken;
 }
 

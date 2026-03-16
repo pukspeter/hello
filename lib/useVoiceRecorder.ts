@@ -26,13 +26,34 @@ const PLAYBACK_AUDIO_MODE = {
   shouldRouteThroughEarpiece: false,
 };
 
+// Speech-to-text does not need music-grade quality. Smaller mono recordings
+// reduce upload and transcription latency, especially against the hosted API.
+const SPEECH_RECORDING_PRESET = {
+  ...RecordingPresets.LOW_QUALITY,
+  sampleRate: 16000,
+  numberOfChannels: 1,
+  bitRate: 32000,
+  android: {
+    ...RecordingPresets.LOW_QUALITY.android,
+    maxFileSize: 512 * 1024,
+  },
+  ios: {
+    ...RecordingPresets.LOW_QUALITY.ios,
+    sampleRate: 16000,
+  },
+  web: {
+    ...RecordingPresets.LOW_QUALITY.web,
+    bitsPerSecond: 32000,
+  },
+};
+
 export type RecordedVoicePayload = {
   audioBase64: string;
   mimeType: string;
 };
 
 export function useVoiceRecorder() {
-  const recorder = useAudioRecorder(RecordingPresets.HIGH_QUALITY);
+  const recorder = useAudioRecorder(SPEECH_RECORDING_PRESET);
   const recorderState = useAudioRecorderState(recorder, 200);
 
   const startRecording = async () => {

@@ -239,14 +239,14 @@ export default function App() {
   const { durationSeconds: voiceRecordingDurationSeconds, isRecording: isRecordingVoice, startRecording, stopRecording } =
     useVoiceRecorder();
 
-  const reloadPictogramCatalog = useCallback(async () => {
+  const reloadPictogramCatalog = useCallback(async (preferredSymbolSetCode?: string | null) => {
     if (!supabase || !session?.user.id) {
       return;
     }
 
     const [categoryData, pictogramData] = await Promise.all([
       fetchPictogramCategories(),
-      fetchPictograms(),
+      fetchPictograms({ preferredSymbolSetCode }),
     ]);
 
     setCategories(categoryData);
@@ -327,10 +327,11 @@ export default function App() {
       setCustomPictogramError(null);
       setImageUploadError(null);
 
-      const [profilesResult] = await Promise.all([
-        fetchChildProfiles(),
-        reloadPictogramCatalog(),
-      ]);
+      const profilesResult = await fetchChildProfiles();
+      const nextActiveProfile =
+        profilesResult.find((profile) => profile.id === activeChildProfileId) ?? profilesResult[0] ?? null;
+
+      await reloadPictogramCatalog(nextActiveProfile?.preferred_symbol_set_code ?? 'hello');
 
       setChildProfiles(profilesResult);
       setActiveChildProfileId((current) => current ?? profilesResult[0]?.id ?? null);
@@ -347,7 +348,7 @@ export default function App() {
       setIsLoadingSettings(false);
       setErrorMessage(error instanceof Error ? error.message : 'Algandmete laadimine ebaonnestus.');
     });
-  }, [reloadPictogramCatalog, session?.user.id]);
+  }, [activeChildProfileId, reloadPictogramCatalog, session?.user.id]);
 
   useEffect(() => {
     if (Platform.OS !== 'web' || !session?.user.id) {
@@ -359,7 +360,10 @@ export default function App() {
     }
 
     const handleFocusRefresh = () => {
-      reloadPictogramCatalog().catch(() => {
+      const activeProfile =
+        childProfiles.find((profile) => profile.id === activeChildProfileId) ?? null;
+
+      reloadPictogramCatalog(activeProfile?.preferred_symbol_set_code ?? 'hello').catch(() => {
         // Ignore silent background refresh errors; the visible UI already has existing data.
       });
     };
@@ -377,7 +381,20 @@ export default function App() {
       window.removeEventListener('focus', handleFocusRefresh);
       document.removeEventListener('visibilitychange', handleVisibilityRefresh);
     };
-  }, [reloadPictogramCatalog, session?.user.id]);
+  }, [activeChildProfileId, childProfiles, reloadPictogramCatalog, session?.user.id]);
+
+  useEffect(() => {
+    if (!supabase || !session?.user.id) {
+      return;
+    }
+
+    const activeProfile =
+      childProfiles.find((profile) => profile.id === activeChildProfileId) ?? null;
+
+    reloadPictogramCatalog(activeProfile?.preferred_symbol_set_code ?? 'hello').catch(() => {
+      // Keep existing pictogram catalog visible if a background variant refresh fails.
+    });
+  }, [activeChildProfileId, childProfiles, reloadPictogramCatalog, session?.user.id]);
 
   useEffect(() => {
     if (!SHOW_SAVED_BOARDS) {

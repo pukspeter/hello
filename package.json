@@ -5,6 +5,7 @@
   "scripts": {
     "build:web": "expo export --platform web",
     "import:pictograms": "node scripts/import-pictograms.mjs",
+    "import:pictograms:csv": "node scripts/import-pictograms-csv.mjs",
     "server": "node server/index.mjs",
     "start": "node server/index.mjs",
     "start:expo": "expo start",

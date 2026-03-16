@@ -7,6 +7,7 @@ type RawChildProfile = {
   name: string;
   notes: string | null;
   preferred_language: string;
+  preferred_symbol_set_code: string | null;
   user_id: string | null;
 };
 
@@ -17,7 +18,7 @@ export async function fetchChildProfiles(): Promise<ChildProfile[]> {
 
   const { data, error } = await supabase
     .from('child_profiles')
-    .select('id, created_at, name, notes, preferred_language, user_id')
+    .select('id, created_at, name, notes, preferred_language, preferred_symbol_set_code, user_id')
     .order('created_at', { ascending: true });
 
   if (error) {
@@ -51,9 +52,10 @@ export async function createChildProfile(input: ChildProfileInput): Promise<Chil
       name: input.name.trim(),
       notes: input.notes?.trim() || null,
       preferred_language: input.preferred_language.trim() || 'et',
+      preferred_symbol_set_code: input.preferred_symbol_set_code?.trim() || 'hello',
       user_id: user.id,
     })
-    .select('id, created_at, name, notes, preferred_language, user_id')
+    .select('id, created_at, name, notes, preferred_language, preferred_symbol_set_code, user_id')
     .single();
 
   if (error) {
@@ -77,9 +79,10 @@ export async function updateChildProfile(
       name: input.name.trim(),
       notes: input.notes?.trim() || null,
       preferred_language: input.preferred_language.trim() || 'et',
+      preferred_symbol_set_code: input.preferred_symbol_set_code?.trim() || 'hello',
     })
     .eq('id', profileId)
-    .select('id, created_at, name, notes, preferred_language, user_id')
+    .select('id, created_at, name, notes, preferred_language, preferred_symbol_set_code, user_id')
     .single();
 
   if (error) {
@@ -96,6 +99,7 @@ function normalizeChildProfile(profile: RawChildProfile): ChildProfile {
     name: profile.name,
     notes: profile.notes,
     preferred_language: profile.preferred_language,
+    preferred_symbol_set_code: profile.preferred_symbol_set_code?.trim() || 'hello',
     user_id: profile.user_id,
   };
 }

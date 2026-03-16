@@ -3,6 +3,12 @@ import { Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-
 import { ChildProfileSelector } from './ChildProfileSelector';
 import type { ChildProfile, ChildProfileInput } from '../types/pictograms';
 
+const SYMBOL_SET_OPTIONS = [
+  { code: 'hello', label: 'HELLO' },
+  { code: 'pcs', label: 'PCS' },
+  { code: 'arasaac', label: 'ARASAAC' },
+] as const;
+
 type ProfileScreenProps = {
   activeChildProfileId: string | null;
   caregiverEmail: string | null;
@@ -21,6 +27,7 @@ const DEFAULT_FORM: ChildProfileInput = {
   name: '',
   notes: '',
   preferred_language: 'et',
+  preferred_symbol_set_code: 'hello',
 };
 
 export function ProfileScreen({
@@ -53,6 +60,7 @@ export function ProfileScreen({
       name: activeProfile.name,
       notes: activeProfile.notes ?? '',
       preferred_language: activeProfile.preferred_language,
+      preferred_symbol_set_code: activeProfile.preferred_symbol_set_code,
     });
   }, [activeProfile]);
 
@@ -187,6 +195,53 @@ export function ProfileScreen({
             style={styles.input}
             value={formValues.preferred_language}
           />
+        </View>
+
+        <View style={styles.field}>
+          <Text style={styles.label}>Sümbolikomplekt</Text>
+          <Text style={styles.symbolSetTitle}>Vali lapsele sobiv pildistiil.</Text>
+          <Text style={styles.symbolSetDescription}>
+            Sama mõiste saab tulevikus kasutada eri piktogrammistiile, näiteks HELLO, PCS või
+            ARASAAC.
+          </Text>
+          <View style={styles.symbolSetRow}>
+            {SYMBOL_SET_OPTIONS.map((option) => {
+              const isSelected =
+                (formValues.preferred_symbol_set_code ?? 'hello') === option.code;
+
+              return (
+                <Pressable
+                  key={option.code}
+                  accessibilityRole="button"
+                  accessibilityLabel={`Vali sumbolikomplekt ${option.label}`}
+                  onPress={() =>
+                    setFormValues((current) => ({
+                      ...current,
+                      preferred_symbol_set_code: option.code,
+                    }))
+                  }
+                  style={({ pressed }) => [
+                    styles.symbolSetOption,
+                    isSelected ? styles.symbolSetOptionSelected : null,
+                    pressed ? styles.newButtonPressed : null,
+                  ]}
+                >
+                  <Text
+                    style={[
+                      styles.symbolSetOptionText,
+                      isSelected ? styles.symbolSetOptionTextSelected : null,
+                    ]}
+                  >
+                    {option.label}
+                  </Text>
+                </Pressable>
+              );
+            })}
+          </View>
+          <Text style={styles.symbolSetHint}>
+            Kui valitud komplektil pole veel koiki pilte olemas, kasutab app automaatselt
+            HELLO varianti.
+          </Text>
         </View>
 
         <View style={styles.field}>
@@ -353,6 +408,50 @@ const styles = StyleSheet.create({
   },
   field: {
     marginBottom: 14,
+  },
+  symbolSetTitle: {
+    fontSize: 16,
+    lineHeight: 22,
+    fontWeight: '700',
+    color: '#2d2417',
+    marginBottom: 6,
+  },
+  symbolSetDescription: {
+    fontSize: 14,
+    lineHeight: 21,
+    color: '#6f6049',
+    marginBottom: 10,
+  },
+  symbolSetRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 10,
+  },
+  symbolSetOption: {
+    borderRadius: 999,
+    borderWidth: 1,
+    borderColor: '#dfd0b6',
+    backgroundColor: '#fff8ee',
+    paddingVertical: 10,
+    paddingHorizontal: 14,
+  },
+  symbolSetOptionSelected: {
+    borderColor: '#2aa89b',
+    backgroundColor: '#e8f7f4',
+  },
+  symbolSetOptionText: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: '#5f513d',
+  },
+  symbolSetOptionTextSelected: {
+    color: '#156b63',
+  },
+  symbolSetHint: {
+    marginTop: 10,
+    fontSize: 13,
+    lineHeight: 18,
+    color: '#7a6a4f',
   },
   label: {
     fontSize: 14,

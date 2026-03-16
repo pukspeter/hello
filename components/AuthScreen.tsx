@@ -27,6 +27,16 @@ export function AuthScreen({
       return;
     }
 
+    if (!email.includes('@')) {
+      setLocalError('Sisesta korrektne emaili aadress.');
+      return;
+    }
+
+    if (password.trim().length < 6) {
+      setLocalError('Parool peab olema vahemalt 6 tahemarki.');
+      return;
+    }
+
     setLocalError(null);
 
     if (isSignUpMode) {
@@ -40,10 +50,10 @@ export function AuthScreen({
   return (
     <View style={styles.screen}>
       <View style={styles.card}>
-        <Text style={styles.eyebrow}>Caregiver Auth</Text>
-        <Text style={styles.title}>Logi sisse, et HELLO kasutaks Supabase RLS reegleid.</Text>
+        <Text style={styles.eyebrow}>Hooldaja konto</Text>
+        <Text style={styles.title}>Logi sisse voi loo konto</Text>
         <Text style={styles.subtitle}>
-          See MVP kasutab emaili ja parooli. Pärast sisselogimist saad hallata ainult oma child profile andmeid.
+          Kasuta emaili ja parooli. Pärast sisselogimist saad hallata ainult oma laste andmeid ja piktogramme.
         </Text>
 
         {errorMessage || localError ? (
@@ -51,6 +61,12 @@ export function AuthScreen({
         ) : null}
 
         {infoMessage ? <Text style={styles.infoText}>{infoMessage}</Text> : null}
+
+        {isSignUpMode ? (
+          <Text style={styles.helperText}>
+            Kui emaili kinnitus on sisse lulitatud, saad parast konto loomist kinnituskirja.
+          </Text>
+        ) : null}
 
         <View style={styles.field}>
           <Text style={styles.label}>Email</Text>
@@ -67,12 +83,12 @@ export function AuthScreen({
         </View>
 
         <View style={styles.field}>
-          <Text style={styles.label}>Password</Text>
+          <Text style={styles.label}>Parool</Text>
           <TextInput
             autoCapitalize="none"
             autoCorrect={false}
             onChangeText={setPassword}
-            placeholder="Your password"
+            placeholder="Sisesta parool"
             placeholderTextColor="#9c8d73"
             secureTextEntry
             style={styles.input}
@@ -82,7 +98,7 @@ export function AuthScreen({
 
         <Pressable
           accessibilityRole="button"
-          accessibilityLabel={isSignUpMode ? 'Create caregiver account' : 'Sign in'}
+          accessibilityLabel={isSignUpMode ? 'Loo konto' : 'Logi sisse'}
           disabled={isSubmitting}
           onPress={handleSubmit}
           style={({ pressed }) => [
@@ -92,17 +108,13 @@ export function AuthScreen({
           ]}
         >
           <Text style={styles.primaryButtonText}>
-            {isSubmitting
-              ? 'Working...'
-              : isSignUpMode
-                ? 'Create caregiver account'
-                : 'Sign in'}
+            {isSubmitting ? 'Tootlen...' : isSignUpMode ? 'Loo konto' : 'Logi sisse'}
           </Text>
         </Pressable>
 
         <Pressable
           accessibilityRole="button"
-          accessibilityLabel={isSignUpMode ? 'Switch to sign in' : 'Switch to sign up'}
+          accessibilityLabel={isSignUpMode ? 'Mul on juba konto' : 'Mul ei ole veel kontot'}
           disabled={isSubmitting}
           onPress={() => {
             setIsSignUpMode((current) => !current);
@@ -114,7 +126,7 @@ export function AuthScreen({
           ]}
         >
           <Text style={styles.secondaryButtonText}>
-            {isSignUpMode ? 'I already have an account' : 'Create a new account'}
+            {isSignUpMode ? 'Mul on juba konto' : 'Mul ei ole veel kontot'}
           </Text>
         </Pressable>
       </View>
@@ -152,10 +164,16 @@ const styles = StyleSheet.create({
   },
   subtitle: {
     marginTop: 12,
-    marginBottom: 18,
+    marginBottom: 14,
     fontSize: 16,
     lineHeight: 24,
     color: '#5f513d',
+  },
+  helperText: {
+    marginBottom: 14,
+    fontSize: 13,
+    lineHeight: 20,
+    color: '#6f624d',
   },
   field: {
     marginBottom: 14,

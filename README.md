@@ -9,6 +9,13 @@ Before testing the app:
 - run `supabase/schema.sql` in Supabase SQL Editor
 - if Email confirmation is enabled in Supabase, new caregivers must confirm their email before signing in
 
+## Symbol set model
+
+HELLO now treats each `pictograms` row as the underlying concept identity used by search, selection, history, favorites, and sentence generation.
+Visual symbol variants live in `pictogram_symbol_variants`, keyed by `pictogram_id + symbol_set_code`.
+The active child profile can prefer a symbol set through `child_profiles.preferred_symbol_set_code`.
+If a preferred variant is missing, the app falls back to the `hello` symbol set and then to the base `pictograms.image_url`.
+
 ## Required environment variables
 
 Client:
@@ -382,3 +389,74 @@ update child_profiles
 set user_id = '<AUTH_USER_ID>'
 where name in ('Kevin', 'Maria');
 ```
+
+## CSV batch import
+
+For faster batch import, use a CSV file as the source of truth and keep matching image files in the same folder.
+
+### CSV format
+
+Create `pictograms.csv` inside your import folder with these columns:
+
+```csv
+slug,label_et,category,uploaded
+hambapesu,Hambapesu,Igapaev,
+valjasoit,Valjasoit,Tegevused,
+```
+
+Rules:
+- `slug` is the primary matching key.
+- `label_et` is saved into `pictograms.label_et`.
+- `category` is matched by name and created if missing.
+- `uploaded` is allowed in the CSV so you can track progress externally; the importer does not rewrite the CSV.
+- Image filenames must match `slug`, for example `hambapesu.png`, `valjasoit.webp`.
+
+### Folder path
+
+Use the same local batch-folder pattern as before, for example:
+
+```text
+/Users/peterpuks/Documents/pictograms/new3
+```
+
+Inside that folder:
+- `pictograms.csv`
+- one image file per row, named by `slug`
+
+### Command
+
+```bash
+npm run import:pictograms:csv -- /Users/peterpuks/Documents/pictograms/new3
+```
+
+Optional:
+- use a custom CSV path:
+
+```bash
+npm run import:pictograms:csv -- /Users/peterpuks/Documents/pictograms/new3 --csv=/Users/peterpuks/Documents/pictograms/new3/pictograms.csv
+```
+
+### Console output
+
+Successful runs print per-row actions and a final summary:
+
+```text
+[CREATE] hambapesu -> Hambapesu (uuid)
+[UPLOAD] hambapesu -> hambapesu.png
+[UPDATE] valjasoit -> label/category updated
+[OK] roomus -> no data changes needed
+[SKIP] row 12 -> missing slug, label_et or category
+[FAIL] oota -> duplicate key value violates unique constraint ...
+
+Summary
+Created: 10
+Updated: 8
+Skipped: 2
+Failed: 1
+```
+
+The summary always reports:
+- `Created`
+- `Updated`
+- `Skipped`
+- `Failed`

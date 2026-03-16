@@ -26,7 +26,9 @@ export function PictogramCard({ categoryName, imageUrl, label, onPress }: Pictog
       </View>
       <View style={styles.footer}>
         {categoryName ? <Text style={styles.category}>{categoryName}</Text> : null}
-        <Text style={styles.label}>{label}</Text>
+        <Text ellipsizeMode="tail" numberOfLines={2} style={styles.label}>
+          {label}
+        </Text>
       </View>
     </Pressable>
   );
@@ -90,5 +92,6 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     color: '#2d2417',
     textAlign: 'center',
+    flexShrink: 1,
   },
 });

@@ -65,6 +65,15 @@ create table if not exists pictogram_categories (
   sort_order int not null default 0
 );
 
+create table if not exists symbol_sets (
+  code text primary key,
+  created_at timestamptz not null default now(),
+  display_name text not null,
+  description text,
+  sort_order int not null default 0,
+  is_enabled boolean not null default true
+);
+
 create table if not exists pictograms (
   id uuid primary key default gen_random_uuid(),
   created_at timestamptz not null default now(),
@@ -85,6 +94,17 @@ add column if not exists created_by_user_id uuid references users(id) on delete 
 alter table pictograms
 add column if not exists is_custom boolean not null default false;
 
+create table if not exists pictogram_symbol_variants (
+  id uuid primary key default gen_random_uuid(),
+  created_at timestamptz not null default now(),
+  pictogram_id uuid not null references pictograms(id) on delete cascade,
+  symbol_set_code text not null references symbol_sets(code) on delete cascade,
+  image_url text not null
+);
+
+create unique index if not exists pictogram_symbol_variants_pictogram_symbol_set_key
+on pictogram_symbol_variants (pictogram_id, symbol_set_code);
+
 insert into storage.buckets (id, name, public)
 values ('pictograms', 'pictograms', true)
 on conflict (id) do update
@@ -92,6 +112,30 @@ set public = excluded.public;
 
 create unique index if not exists pictogram_categories_name_key
 on pictogram_categories (name);
+
+insert into symbol_sets (code, display_name, description, sort_order)
+values
+  ('hello', 'HELLO', 'HELLO vaikimisi sumbolid', 1),
+  ('pcs', 'PCS-style', 'Tulevane PCS-stiilis sumbolikomplekt', 2),
+  ('arasaac', 'ARASAAC-style', 'Tulevane ARASAAC-stiilis sumbolikomplekt', 3)
+on conflict (code) do update
+set display_name = excluded.display_name,
+    description = excluded.description,
+    sort_order = excluded.sort_order,
+    is_enabled = true;
+
+alter table child_profiles
+add column if not exists preferred_symbol_set_code text references symbol_sets(code) on delete set null;
+
+update child_profiles
+set preferred_symbol_set_code = 'hello'
+where preferred_symbol_set_code is null;
+
+alter table child_profiles
+alter column preferred_symbol_set_code set default 'hello';
+
+alter table child_profiles
+alter column preferred_symbol_set_code set not null;
 
 drop index if exists pictograms_label_et_key;
 
@@ -276,12 +320,21 @@ and (
   or pictograms.sort_order is distinct from seed.sort_order
 );
 
+insert into pictogram_symbol_variants (pictogram_id, symbol_set_code, image_url)
+select id, 'hello', image_url
+from pictograms
+where image_url is not null
+on conflict (pictogram_id, symbol_set_code) do update
+set image_url = excluded.image_url;
+
 alter table child_profiles enable row level security;
 alter table sentence_history enable row level security;
 alter table favorite_sentences enable row level security;
 alter table child_pictogram_settings enable row level security;
 alter table saved_boards enable row level security;
 alter table pictograms enable row level security;
+alter table symbol_sets enable row level security;
+alter table pictogram_symbol_variants enable row level security;
 
 drop policy if exists "caregivers_select_own_child_profiles" on child_profiles;
 create policy "caregivers_select_own_child_profiles"
@@ -606,3 +659,27 @@ on pictograms
 for delete
 to authenticated
 using (created_by_user_id = auth.uid());
+
+drop policy if exists "authenticated_users_select_symbol_sets" on symbol_sets;
+create policy "authenticated_users_select_symbol_sets"
+on symbol_sets
+for select
+to authenticated
+using (true);
+
+drop policy if exists "caregivers_select_symbol_variants_for_accessible_pictograms" on pictogram_symbol_variants;
+create policy "caregivers_select_symbol_variants_for_accessible_pictograms"
+on pictogram_symbol_variants
+for select
+to authenticated
+using (
+  exists (
+    select 1
+    from pictograms
+    where pictograms.id = pictogram_symbol_variants.pictogram_id
+      and (
+        pictograms.is_custom = false
+        or pictograms.created_by_user_id = auth.uid()
+      )
+  )
+);
