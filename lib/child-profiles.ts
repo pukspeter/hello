@@ -7,9 +7,14 @@ type RawChildProfile = {
   name: string;
   notes: string | null;
   preferred_language: string;
-  preferred_symbol_set_code: string | null;
+  preferred_symbol_set_code?: string | null;
   user_id: string | null;
 };
+
+const CHILD_PROFILE_SELECT_WITH_SYMBOL_SET =
+  'id, created_at, name, notes, preferred_language, preferred_symbol_set_code, user_id';
+const CHILD_PROFILE_SELECT_LEGACY =
+  'id, created_at, name, notes, preferred_language, user_id';
 
 export async function fetchChildProfiles(): Promise<ChildProfile[]> {
   if (!supabase) {
@@ -18,8 +23,21 @@ export async function fetchChildProfiles(): Promise<ChildProfile[]> {
 
   const { data, error } = await supabase
     .from('child_profiles')
-    .select('id, created_at, name, notes, preferred_language, preferred_symbol_set_code, user_id')
+    .select(CHILD_PROFILE_SELECT_WITH_SYMBOL_SET)
     .order('created_at', { ascending: true });
+
+  if (error?.code === '42703') {
+    const legacyResult = await supabase
+      .from('child_profiles')
+      .select(CHILD_PROFILE_SELECT_LEGACY)
+      .order('created_at', { ascending: true });
+
+    if (legacyResult.error) {
+      throw new Error(legacyResult.error.message);
+    }
+
+    return (legacyResult.data ?? []).map(normalizeChildProfile);
+  }
 
   if (error) {
     throw new Error(error.message);
@@ -55,8 +73,27 @@ export async function createChildProfile(input: ChildProfileInput): Promise<Chil
       preferred_symbol_set_code: input.preferred_symbol_set_code?.trim() || 'hello',
       user_id: user.id,
     })
-    .select('id, created_at, name, notes, preferred_language, preferred_symbol_set_code, user_id')
+    .select(CHILD_PROFILE_SELECT_WITH_SYMBOL_SET)
     .single();
+
+  if (error?.code === '42703') {
+    const legacyResult = await supabase
+      .from('child_profiles')
+      .insert({
+        name: input.name.trim(),
+        notes: input.notes?.trim() || null,
+        preferred_language: input.preferred_language.trim() || 'et',
+        user_id: user.id,
+      })
+      .select(CHILD_PROFILE_SELECT_LEGACY)
+      .single();
+
+    if (legacyResult.error) {
+      throw new Error(legacyResult.error.message);
+    }
+
+    return normalizeChildProfile(legacyResult.data);
+  }
 
   if (error) {
     throw new Error(error.message);
@@ -82,8 +119,27 @@ export async function updateChildProfile(
       preferred_symbol_set_code: input.preferred_symbol_set_code?.trim() || 'hello',
     })
     .eq('id', profileId)
-    .select('id, created_at, name, notes, preferred_language, preferred_symbol_set_code, user_id')
+    .select(CHILD_PROFILE_SELECT_WITH_SYMBOL_SET)
     .single();
+
+  if (error?.code === '42703') {
+    const legacyResult = await supabase
+      .from('child_profiles')
+      .update({
+        name: input.name.trim(),
+        notes: input.notes?.trim() || null,
+        preferred_language: input.preferred_language.trim() || 'et',
+      })
+      .eq('id', profileId)
+      .select(CHILD_PROFILE_SELECT_LEGACY)
+      .single();
+
+    if (legacyResult.error) {
+      throw new Error(legacyResult.error.message);
+    }
+
+    return normalizeChildProfile(legacyResult.data);
+  }
 
   if (error) {
     throw new Error(error.message);
