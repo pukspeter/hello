@@ -68,6 +68,24 @@ export async function fetchPictograms(options?: {
     .eq('is_enabled', true)
     .order('sort_order');
 
+  if (error?.code === 'PGRST200') {
+    const legacyResult = await supabase
+      .from('pictograms')
+      .select(
+        'created_by_user_id, id, category_id, image_url, is_custom, is_enabled, label_en, label_et, label_ru, sort_order'
+      )
+      .eq('is_enabled', true)
+      .order('sort_order');
+
+    if (legacyResult.error) {
+      throw new Error(legacyResult.error.message);
+    }
+
+    return (legacyResult.data ?? []).map((pictogram) =>
+      normalizePictogram(pictogram, preferredSymbolSetCode)
+    );
+  }
+
   if (error) {
     throw new Error(error.message);
   }
