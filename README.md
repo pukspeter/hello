@@ -69,6 +69,96 @@ Server:
 22. Open `History` and verify each sentence card now shows the actual pictograms used in that sentence instead of raw UUID strings.
 23. Open `Favorites` and verify each favorite sentence card also shows the same visual pictogram strip with labels.
 
+## Android development build test
+
+Use this when you want the current HELLO app on a real Android phone instead of only Expo web.
+
+### What was added for Android
+
+- `expo-dev-client` is installed, so HELLO can run as a real development build
+- `app.json` now includes a unique Android application id:
+  - `com.peterpuks.hello`
+- `eas.json` now defines:
+  - `development` Android dev client build as an `apk`
+  - `preview` internal testing `apk`
+  - `production` Android App Bundle for later Play Store release
+
+### Android permissions
+
+- Microphone:
+  - handled by the `expo-audio` plugin
+  - permission string is already configured in `app.json`
+- Audio playback:
+  - no extra Android runtime permission is needed for normal app playback
+- Network access:
+  - Android network access is available by default for Expo/React Native builds
+  - the app still needs a reachable backend URL in `EXPO_PUBLIC_API_BASE_URL`
+
+### First-time setup
+
+1. Make sure `.env` is filled.
+2. Start the local backend so the phone can reach the API on your computer:
+   - `npm run server`
+3. Install EAS CLI once if needed:
+   - `npm install -g eas-cli`
+4. Log in:
+   - `eas login`
+
+### Build the Android development app
+
+Run:
+- `npm run android:dev`
+
+Expected result:
+- EAS creates an Android development build `apk`
+- on the first run, EAS may ask to create or link the Expo project
+- when the build finishes, EAS gives you an install URL or QR code
+
+### Start the app after install
+
+1. Install the generated APK on your Android phone.
+2. Start the Metro bundler for dev client mode:
+   - `npm run start:dev-client`
+3. On the phone, open the HELLO development build.
+4. Connect to the same Metro server.
+
+### If your phone should use the backend running on your computer
+
+Set:
+- `EXPO_PUBLIC_API_BASE_URL=http://YOUR_COMPUTER_LOCAL_IP:8787`
+
+Example:
+- `EXPO_PUBLIC_API_BASE_URL=http://192.168.1.213:8787`
+
+Important:
+- the phone and computer must be on the same Wi-Fi
+- `localhost` or `127.0.0.1` will not work from the phone
+
+### What to test first on a real Android phone
+
+1. Sign in.
+2. Open `Profile` and verify the child profile is visible.
+3. Open `Speak` and verify pictograms load.
+4. Test `Push to talk`:
+   - allow microphone permission
+   - start recording
+   - stop recording
+   - verify transcription returns and pictograms are matched
+5. Test `Play sentence` and verify audio playback works from the phone speaker.
+6. In `Caregiver`, test image picking from the Android photo library.
+
+### What is still missing before Play Store release
+
+- proper app name/icon/final branding polish
+- Play Store privacy policy and legal pages
+- stronger Android QA across multiple devices
+- stable production frontend + backend deploy flow
+- secret rotation and security cleanup
+- release signing process review
+- Play Store `aab` build and store listing assets
+- crash/error monitoring
+- analytics and feedback loop for real users
+
 ## Saved boards / routine packs
 
 The saved boards data model is still in the codebase, but the UI is currently hidden.

@@ -408,13 +408,6 @@ export default function App() {
   }, [activeChildProfileId, childProfiles, reloadPictogramCatalog, session?.user.id]);
 
   useEffect(() => {
-    if (!SHOW_SAVED_BOARDS) {
-      setIsLoadingBoards(false);
-      setBoardsError(null);
-      setSavedBoards([]);
-      return;
-    }
-
     if (!supabase || !session?.user.id) {
       return;
     }
@@ -1375,27 +1368,27 @@ export default function App() {
       <View style={styles.tabBar}>
         <TabButton
           isActive={activeTab === SPEAK_TAB}
-          label="Speak"
+          label="Räägi"
           onPress={() => setActiveTab(SPEAK_TAB)}
         />
         <TabButton
           isActive={activeTab === HISTORY_TAB}
-          label="History"
+          label="Ajalugu"
           onPress={() => setActiveTab(HISTORY_TAB)}
         />
         <TabButton
           isActive={activeTab === FAVORITES_TAB}
-          label="Favorites"
+          label="Lemmikud"
           onPress={() => setActiveTab(FAVORITES_TAB)}
         />
         <TabButton
           isActive={activeTab === PROFILE_TAB}
-          label="Profile"
+          label="Profiil"
           onPress={() => setActiveTab(PROFILE_TAB)}
         />
         <TabButton
           isActive={activeTab === CAREGIVER_TAB}
-          label="Caregiver"
+          label="Haldus"
           onPress={() => setActiveTab(CAREGIVER_TAB)}
         />
       </View>
@@ -1410,14 +1403,14 @@ export default function App() {
               <Text style={styles.eyebrow}>HELLO MVP</Text>
               <Text style={styles.title}>Vali pildid ja ehita lause samm-sammult.</Text>
               <Text style={styles.subtitle}>
-                Rahulik avavaade esimesele kasutatavale kodulehele. AI lauseehitus tuleb jargmises etapis.
+                Rahulik põhivaade piltide valimiseks, lause loomiseks ja ettelugemiseks.
               </Text>
             </View>
 
             <View style={styles.activeChildCard}>
               <Text style={styles.activeChildLabel}>Aktiivne laps</Text>
               <Text style={styles.activeChildName}>
-                {activeChildProfile?.name ?? 'Vali profiil Profile tabis'}
+                {activeChildProfile?.name ?? 'Vali profiil Profiil vaatest'}
               </Text>
             </View>
 
@@ -1464,7 +1457,7 @@ export default function App() {
 
             {errorMessage ? (
               <View style={styles.messageCard}>
-                <Text style={styles.messageTitle}>Seadistus vajab tahelepanu</Text>
+                <Text style={styles.messageTitle}>Seadistus vajab tähelepanu</Text>
                 <Text style={styles.messageText}>{errorMessage}</Text>
               </View>
             ) : null}
@@ -1487,7 +1480,7 @@ export default function App() {
 
             <SearchField
               onChangeText={setSpeakSearchQuery}
-              placeholder="Otsi sona voi piktogrammi ule koigi piltide"
+              placeholder="Otsi sõna või piktogrammi üle kõigi piltide"
               value={speakSearchQuery}
             />
 
@@ -1511,7 +1504,7 @@ export default function App() {
                 </Text>
                 <Text style={styles.messageText}>
                   {speakSearchQuery.trim()
-                    ? 'Proovi teist sona voi tuhjad otsinguvaja.'
+                    ? 'Proovi teist sõna või tühjenda otsing.'
                     : 'Kontrolli, et `pictograms` tabelis oleksid read olemas ja seotud kategooriatega.'}
                 </Text>
               </View>
@@ -1567,7 +1560,7 @@ export default function App() {
       ) : activeTab === HISTORY_TAB ? (
         <HistoryScreen
           actionErrorMessage={entryActionError}
-          emptyMessage="Genereeri esimesed laused Speak vaates."
+          emptyMessage="Genereeri esimesed laused Räägi vaates."
           entries={historyEntries}
           errorMessage={historyError}
           favoritingEntryId={savingHistoryFavoriteId}
@@ -1580,13 +1573,13 @@ export default function App() {
           onPlayEntry={handlePlaySavedEntry}
           onUseEntry={handleUseSavedEntry}
           playingEntryId={playingSavedEntryId}
-          subtitle="Lihtne MVP vaade, mis kuvab laused uusimast vanimani."
+          subtitle="Siin näed viimaseid loodud lauseid uusimast vanimani."
           title={activeChildProfile ? `${activeChildProfile.name} viimased loodud laused.` : 'Viimased loodud laused.'}
         />
       ) : activeTab === FAVORITES_TAB ? (
         <HistoryScreen
           actionErrorMessage={entryActionError}
-          emptyMessage="Salvesta generated sentence lemmikuks Speak vaates."
+          emptyMessage="Salvesta loodud lause lemmikuks Räägi vaates."
           entries={favoriteEntries}
           errorMessage={favoritesError}
           getEntryPictograms={getEntryPictogramItems}
@@ -1596,7 +1589,7 @@ export default function App() {
           onUseEntry={handleUseSavedEntry}
           playingEntryId={playingSavedEntryId}
           removingEntryId={removingFavoriteId}
-          subtitle="Lihtne MVP vaade sinu salvestatud lemmiklausetest."
+          subtitle="Siin näed sinu salvestatud lemmiklauseid."
           title={activeChildProfile ? `${activeChildProfile.name} lemmikud.` : 'Salvestatud lemmikud.'}
         />
       ) : activeTab === PROFILE_TAB ? (

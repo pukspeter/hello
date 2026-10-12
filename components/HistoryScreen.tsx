@@ -44,7 +44,7 @@ export function HistoryScreen({
   return (
     <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
       <View style={styles.hero}>
-        <Text style={styles.eyebrow}>History</Text>
+        <Text style={styles.eyebrow}>Ajalugu</Text>
         <Text style={styles.title}>{title}</Text>
         <Text style={styles.subtitle}>{subtitle}</Text>
       </View>
@@ -87,21 +87,21 @@ export function HistoryScreen({
                   {onUseEntry ? (
                     <Pressable
                       accessibilityRole="button"
-                      accessibilityLabel={`Ava lause Speak vaates ${entry.sentence_text}`}
+                      accessibilityLabel={`Kasuta lauset Räägi vaates ${entry.sentence_text}`}
                       onPress={() => onUseEntry(entry)}
                       style={({ pressed }) => [
                         styles.useButton,
                         pressed ? styles.useButtonPressed : null,
                       ]}
                     >
-                      <Text style={styles.useButtonText}>Use in Speak</Text>
+                      <Text style={styles.useButtonText}>Kasuta rääkimises</Text>
                     </Pressable>
                   ) : null}
 
                   {onPlayEntry ? (
                     <Pressable
                       accessibilityRole="button"
-                      accessibilityLabel={`Play sentence ${entry.sentence_text}`}
+                      accessibilityLabel={`Esita lause ${entry.sentence_text}`}
                       disabled={playingEntryId === entry.id}
                       onPress={() => onPlayEntry(entry)}
                       style={({ pressed }) => [
@@ -111,7 +111,7 @@ export function HistoryScreen({
                       ]}
                     >
                       <Text style={styles.playButtonText}>
-                        {playingEntryId === entry.id ? 'Loon heli...' : 'Play sentence'}
+                        {playingEntryId === entry.id ? 'Loon heli...' : 'Esita lause'}
                       </Text>
                     </Pressable>
                   ) : null}
@@ -119,7 +119,7 @@ export function HistoryScreen({
                   {onFavoriteEntry ? (
                     <Pressable
                       accessibilityRole="button"
-                      accessibilityLabel={`Add ${entry.sentence_text} to favorites`}
+                      accessibilityLabel={`Lisa lemmikuks ${entry.sentence_text}`}
                       disabled={favoritingEntryId === entry.id || Boolean(isEntryFavorite?.(entry))}
                       onPress={() => onFavoriteEntry(entry)}
                       style={({ pressed }) => [
@@ -136,8 +136,8 @@ export function HistoryScreen({
                         {favoritingEntryId === entry.id
                           ? 'Salvestan...'
                           : isEntryFavorite?.(entry)
-                            ? 'Saved to favorites'
-                            : 'Add to favorites'}
+                            ? 'Lemmikutesse salvestatud'
+                            : 'Lisa lemmikuks'}
                       </Text>
                     </Pressable>
                   ) : null}
@@ -145,7 +145,7 @@ export function HistoryScreen({
                   {onRemoveEntry ? (
                     <Pressable
                       accessibilityRole="button"
-                      accessibilityLabel={`Remove favorite ${entry.sentence_text}`}
+                      accessibilityLabel={`Eemalda lemmik ${entry.sentence_text}`}
                       disabled={removingEntryId === entry.id}
                       onPress={() => onRemoveEntry(entry.id)}
                       style={({ pressed }) => [
@@ -155,7 +155,7 @@ export function HistoryScreen({
                       ]}
                     >
                       <Text style={styles.removeButtonText}>
-                        {removingEntryId === entry.id ? 'Removing...' : 'Remove'}
+                        {removingEntryId === entry.id ? 'Eemaldan...' : 'Eemalda'}
                       </Text>
                     </Pressable>
                   ) : null}

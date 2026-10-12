@@ -1,5 +1,6 @@
 import * as FileSystem from 'expo-file-system/legacy';
 import {
+  getRecordingPermissionsAsync,
   RecordingPresets,
   requestRecordingPermissionsAsync,
   setAudioModeAsync,
@@ -100,11 +101,7 @@ export function useVoiceRecorder() {
       return;
     }
 
-    const permission = await requestRecordingPermissionsAsync();
-
-    if (!permission.granted) {
-      throw new Error('Luba mikrofoni ligipaas, et saaksid voice inputi kasutada.');
-    }
+    await ensureNativeRecordingPermission();
 
     setIsRecordingIntent(true);
 
@@ -248,6 +245,28 @@ export function useVoiceRecorder() {
     startRecording,
     stopRecording,
   };
+}
+
+async function ensureNativeRecordingPermission() {
+  const currentPermission = await getRecordingPermissionsAsync();
+
+  if (currentPermission.granted) {
+    return currentPermission;
+  }
+
+  const requestedPermission = await requestRecordingPermissionsAsync();
+
+  if (requestedPermission.granted) {
+    return requestedPermission;
+  }
+
+  if (requestedPermission.canAskAgain === false) {
+    throw new Error(
+      'HELLO-l puudub mikrofoni luba. Ava Androidis Seaded -> Rakendused -> HELLO -> Oigused -> Mikrofon, luba kasutamine ja ava app uuesti.'
+    );
+  }
+
+  throw new Error('Luba mikrofoni ligipaas, et saaksid voice inputi kasutada.');
 }
 
 async function readWebRecordingAsBase64(uri: string) {

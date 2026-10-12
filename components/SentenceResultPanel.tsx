@@ -41,17 +41,18 @@ export function SentenceResultPanel({
   const buttonLabel = isLoading ? 'Genereerin...' : 'Genereeri lause';
   const isDisabled = isLoading || payloadCount === 0 || !isConfigured;
   const canPlay = Boolean(result?.sentence) && isAudioConfigured;
-  const playButtonLabel = isGeneratingAudio ? 'Loon heli...' : 'Play sentence';
+  const playButtonLabel = isGeneratingAudio ? 'Loon heli...' : 'Esita lause';
   const favoriteButtonLabel = isSavingFavorite
     ? 'Salvestan...'
     : isFavorite
-      ? 'Saved to favorites'
-      : 'Add to favorites';
+      ? 'Lemmikutesse salvestatud'
+      : 'Lisa lemmikuks';
+  const replayButtonLabel = 'Kuula uuesti';
 
   return (
     <View style={[styles.wrapper, isCompactMobile ? styles.wrapperCompact : null]}>
       <Text style={[styles.meta, isCompactMobile ? styles.metaCompact : null]}>
-        AI payload valmis: {payloadCount} piktogrammi
+        Lause sisend valmis: {payloadCount} piktogrammi
       </Text>
 
       <View style={[styles.card, isCompactMobile ? styles.cardCompact : null]}>
@@ -60,7 +61,7 @@ export function SentenceResultPanel({
             Loodud lause
           </Text>
           <Text style={[styles.sentence, isCompactMobile ? styles.sentenceCompact : null]}>
-            {result?.sentence ?? 'Vali piktogrammid ja loo esimene eestikeelne lause.'}
+            {result?.sentence ?? 'Vali piktogrammid ja loo eestikeelne lause.'}
           </Text>
         </View>
         {errorMessage ? (
@@ -75,12 +76,12 @@ export function SentenceResultPanel({
         ) : null}
         {!isConfigured ? (
           <Text style={[styles.hint, isCompactMobile ? styles.feedbackTextCompact : null]}>
-            Lisa `EXPO_PUBLIC_API_BASE_URL`, et lause API tootaks.
+            Lisa `EXPO_PUBLIC_API_BASE_URL`, et lause API töötaks.
           </Text>
         ) : null}
         {result && !isAudioConfigured ? (
           <Text style={[styles.hint, isCompactMobile ? styles.feedbackTextCompact : null]}>
-            Lisa serverisse Google Cloud TTS credentials, et eestikeelne playback tootaks.
+            Lisa serverisse Google Cloud TTS credentials, et eestikeelne ettelugemine töötaks.
           </Text>
         ) : null}
 
@@ -149,7 +150,7 @@ export function SentenceResultPanel({
 
             <Pressable
               accessibilityRole="button"
-              accessibilityLabel="Play again"
+              accessibilityLabel={replayButtonLabel}
               disabled={!hasAudio || isGeneratingAudio}
               onPress={onPlayAgain}
               style={({ pressed }) => [
@@ -165,7 +166,7 @@ export function SentenceResultPanel({
                   isCompactMobile ? styles.secondaryButtonTextCompact : null,
                 ]}
               >
-                Play again
+                {replayButtonLabel}
               </Text>
             </Pressable>
           </View>
@@ -187,7 +188,7 @@ const styles = StyleSheet.create({
   meta: {
     fontSize: 10,
     color: '#88755c',
-    marginBottom: 4,
+    marginBottom: 3,
   },
   metaCompact: {
     marginBottom: 2,
@@ -198,8 +199,8 @@ const styles = StyleSheet.create({
     borderColor: '#e8dcc8',
     backgroundColor: '#fff8ee',
     paddingHorizontal: 14,
-    paddingVertical: 12,
-    gap: 6,
+    paddingVertical: 11,
+    gap: 5,
   },
   cardCompact: {
     paddingHorizontal: 12,
